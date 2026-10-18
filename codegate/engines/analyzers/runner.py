@@ -1,13 +1,14 @@
 import asyncio
 import logging
-import subprocess
+import os
 import time
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
 from codegate.config.settings import settings
-from codegate.database.models.analysis import AnalysisRun, AnalyzerRun, CodeMetric, Finding, Source, Status
+from codegate.database.models.analysis import AnalysisRun, AnalyzerRun, CodeMetric, Finding, Status
 from codegate.engines.analyzers.bandit_analyzer import BanditAnalyzer
 from codegate.engines.analyzers.base import BaseAnalyzer
 from codegate.engines.analyzers.radon_analyzer import RadonAnalyzer
@@ -46,10 +47,8 @@ class StaticAnalysisRunner:
             analysis_run_id=self.analysis_run.id,
             analyzer=analyzer.name,
             status=Status.RUNNING,
-            started_at=time.time() # Just simplified for sqlite, wait it wants datetime
+            started_at=datetime.now(timezone.utc),
         )
-        from datetime import datetime, timezone
-        db_run.started_at = datetime.now(timezone.utc)
         self.db.add(db_run)
         self.db.commit()
         
@@ -83,6 +82,7 @@ class StaticAnalysisRunner:
                     process.kill()
                 except OSError:
                     pass
+                await process.communicate()
                 result = AnalyzerResult(
                     analyzer=analyzer.name,
                     status=Status.TIMEOUT,
@@ -110,16 +110,28 @@ class StaticAnalysisRunner:
         
         return result
 
-    def _persist_results(self, result: AnalyzerResult):
+    def _relative_path(self, path: Optional[str], workspace_dir: Optional[str]) -> Optional[str]:
+        if path is None:
+            return None
+        if workspace_dir and os.path.isabs(path):
+            path = os.path.relpath(path, workspace_dir)
+        return path.replace("\\", "/").removeprefix("./")
+
+    def _persist_results(self, result: AnalyzerResult, workspace_dir: Optional[str] = None):
         """Persist findings and metrics to DB."""
+        workspace_dir = workspace_dir or self.workspace.workspace_dir
+        changed_files = {item.filename for item in self.analysis_run.pull_request.files}
         for finding in result.findings:
+            file_path = self._relative_path(finding.file_path, workspace_dir)
             db_finding = Finding(
                 analysis_run_id=self.analysis_run.id,
                 source=finding.analyzer,
                 category=finding.category,
                 severity=finding.severity,
                 rule_id=finding.rule_id,
-                file_path=finding.file_path,
+                file_path=file_path,
+                is_changed_file=file_path in changed_files if changed_files else None,
+                is_new_code=finding.is_new_code,
                 start_line=finding.start_line,
                 end_line=finding.end_line,
                 title=finding.title,
@@ -130,11 +142,14 @@ class StaticAnalysisRunner:
             self.db.add(db_finding)
             
         for metric in result.metrics:
+            file_path = self._relative_path(metric.file_path, workspace_dir)
+            if changed_files and file_path not in changed_files:
+                continue
             db_metric = CodeMetric(
                 analysis_run_id=self.analysis_run.id,
                 analyzer=metric.analyzer,
                 metric_name=metric.metric_name,
-                file_path=metric.file_path,
+                file_path=file_path,
                 symbol=metric.symbol,
                 value=metric.value,
                 grade=metric.grade,
@@ -157,9 +172,10 @@ class StaticAnalysisRunner:
             # with asyncio.gather if desired.
             for analyzer in self.analyzers:
                 result = await self._run_analyzer(analyzer, workspace_dir)
-                self._persist_results(result)
+                self._persist_results(result, workspace_dir)
                 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to prepare workspace or run analyzers")
+            raise
         finally:
             self.workspace.cleanup()

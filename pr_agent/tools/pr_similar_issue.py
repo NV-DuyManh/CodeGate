@@ -62,7 +62,7 @@ class PRSimilarIssue:
 
             upsert = True
             pinecone.init(api_key=api_key, environment=environment)
-            if not index_name in pinecone.list_indexes():
+            if index_name not in pinecone.list_indexes():
                 run_from_scratch = True
                 upsert = False
             else:
@@ -178,9 +178,7 @@ class PRSimilarIssue:
         elif get_settings().pr_similar_issue.vectordb == "qdrant":
             try:
                 import qdrant_client
-                from qdrant_client.models import (Distance, FieldCondition,
-                                                  Filter, MatchValue,
-                                                  PointStruct, VectorParams)
+                from qdrant_client.models import Distance, FieldCondition, Filter, MatchValue, PointStruct, VectorParams
             except Exception:
                 raise Exception("Please install qdrant-client to use qdrant as vectordb")
 
@@ -288,6 +286,8 @@ class PRSimilarIssue:
         score_list = []
 
         if get_settings().pr_similar_issue.vectordb == "pinecone":
+            import pinecone
+
             pinecone_index = pinecone.Index(index_name=self.index_name)
             res = pinecone_index.query(embeds[0],
                                     top_k=5,
@@ -399,6 +399,10 @@ class PRSimilarIssue:
         return issue_str, comments, number
 
     def _update_index_with_issues(self, issues_list, repo_name_for_index, upsert=False):
+        import pandas as pd
+        import pinecone
+        from pinecone_datasets import Dataset, DatasetMetadata
+
         get_logger().info('Processing issues...')
         corpus = Corpus()
         example_issue_record = Record(
@@ -465,7 +469,7 @@ class PRSimilarIssue:
         except:
             embeds = []
             get_logger().error('Failed to embed entire list, embedding one by one...')
-            for i, text in enumerate(list_to_encode):
+            for _i, text in enumerate(list_to_encode):
                 try:
                     res = openai.Embedding.create(input=[text], engine=MODEL)
                     embeds.append(res['data'][0]['embedding'])
@@ -494,6 +498,8 @@ class PRSimilarIssue:
         get_logger().info('Done')
 
     def _update_table_with_issues(self, issues_list, repo_name_for_index, ingest=False):
+        import pandas as pd
+
         get_logger().info('Processing issues...')
 
         corpus = Corpus()
@@ -561,7 +567,7 @@ class PRSimilarIssue:
         except:
             embeds = []
             get_logger().error('Failed to embed entire list, embedding one by one...')
-            for i, text in enumerate(list_to_encode):
+            for _i, text in enumerate(list_to_encode):
                 try:
                     res = openai.Embedding.create(input=[text], engine=MODEL)
                     embeds.append(res['data'][0]['embedding'])
@@ -660,7 +666,7 @@ class PRSimilarIssue:
         except Exception:
             embeds = []
             get_logger().error('Failed to embed entire list, embedding one by one...')
-            for i, text in enumerate(list_to_encode):
+            for _i, text in enumerate(list_to_encode):
                 try:
                     res = openai.Embedding.create(input=[text], engine=MODEL)
                     embeds.append(res['data'][0]['embedding'])

@@ -5,21 +5,21 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from codegate.api.exceptions import register_exception_handlers
 from codegate.api.routers import (
-    auth,
-    workspaces,
     analyses,
     analytics,
+    auth,
     dashboard,
     findings,
     github,
     health,
+    members,
     pull_requests,
     repositories,
     reviewer,
     system,
     testing,
     webhooks,
-    members,
+    workspaces,
 )
 
 app = FastAPI(

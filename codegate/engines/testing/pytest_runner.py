@@ -29,6 +29,13 @@ class PytestRunner:
         # We output xml to a fixed file in the working directory
         junit_xml_path = "junit_report.xml"
         coverage_json_path = "coverage_report.json"
+        python_executable = getattr(self.executor, "python_executable", "python")
+
+        # Never trust reports left by an earlier run or committed in the repo.
+        for report in (junit_xml_path, coverage_json_path, ".coverage"):
+            report_path = os.path.join(working_directory, report)
+            if os.path.lexists(report_path):
+                os.remove(report_path)
         
         if install_command:
             command = ["sh", "-c", f"{install_command} && {test_command or 'pytest'}"]
@@ -36,7 +43,7 @@ class PytestRunner:
             command = ["sh", "-c", test_command]
         else:
             command = [
-                "python", "-m"
+                python_executable, "-m"
             ]
             
             if coverage_enabled:
@@ -79,10 +86,10 @@ class PytestRunner:
         coverage_metrics = None
         if coverage_enabled:
             # Generate the json report
-            cov_cmd = ["python", "-m", "coverage", "json", "-o", coverage_json_path]
+            cov_cmd = [python_executable, "-m", "coverage", "json", "-o", coverage_json_path]
             # If the user supplied a custom test command, we don't know how to run coverage automatically unless they output coverage.json.
             # We'll just run `coverage json` and see if they ran coverage via their script.
-            await self.executor.execute(
+            cov_exit_code, _, _, cov_timed_out = await self.executor.execute(
                 command=cov_cmd,
                 working_directory=working_directory,
                 timeout_seconds=60,
@@ -90,21 +97,19 @@ class PytestRunner:
             )
             
             cov_full_path = os.path.join(working_directory, coverage_json_path)
-            if os.path.exists(cov_full_path):
+            if cov_exit_code == 0 and not cov_timed_out and os.path.exists(cov_full_path):
                 with open(cov_full_path, 'r', encoding='utf-8') as f:
                     coverage_metrics = CoverageParser.parse(f.read())
                     
         # Determine test outcome
-        test_outcome = TestOutcome.UNKNOWN
-        if junit_metrics.tests > 0:
+        if exit_code != 0:
+            test_outcome = TestOutcome.FAILED
+        elif junit_metrics.tests > 0:
             if junit_metrics.failures > 0 or junit_metrics.errors > 0:
                 test_outcome = TestOutcome.FAILED
             else:
                 test_outcome = TestOutcome.PASSED
         else:
-            if exit_code == 0:
-                test_outcome = TestOutcome.PASSED
-            else:
-                test_outcome = TestOutcome.FAILED
+            test_outcome = TestOutcome.PASSED
                 
         return ExecutionStatus.COMPLETED, test_outcome, junit_metrics, coverage_metrics, stdout, stderr

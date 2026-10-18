@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from codegate.api.dependencies import get_current_workspace, get_db, require_workspace_permission
-from codegate.auth.permissions import Permissions
 from codegate.api.pagination import PaginationParams, get_pagination_params, paginate
+from codegate.auth.permissions import Permissions
 from codegate.database.models import Team
 from codegate.repositories.policy_store import policy_evaluation_store
 from codegate.schemas.analysis import AnalysisRunCreate, AnalysisRunResponse, CodeMetricResponse
@@ -139,7 +139,7 @@ def retry_analysis(
     workspace: Team = Depends(require_workspace_permission(Permissions.ANALYSIS_RETRY))
 ):
     """Manually retry a failed or skipped analysis"""
-    from codegate.database.models.analysis import Status, AnalysisJob, AnalysisRun
+    from codegate.database.models.analysis import AnalysisJob, AnalysisRun, Status
     from codegate.worker.tasks import analyze_pull_request
     
     analysis = analysis_service.get(db, analysis_id, workspace.id)

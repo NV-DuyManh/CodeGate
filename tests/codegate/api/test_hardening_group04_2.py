@@ -1,12 +1,14 @@
-import pytest
 import asyncio
-from unittest.mock import patch, MagicMock
+from unittest.mock import AsyncMock, patch
+
+import pytest
 from sqlalchemy.orm import Session
 
+from codegate.database.models.analysis import Status, Trigger
 from codegate.database.models.pull_request import PullRequest
 from codegate.database.models.repository import Repository
-from codegate.database.models.analysis import AnalysisRun, Status, Trigger
 from codegate.services.analysis_orchestrator import AnalysisOrchestrator
+
 
 # 3. ANALYSIS LIFECYCLE VERIFICATION
 @pytest.mark.asyncio
@@ -33,7 +35,10 @@ async def test_analysis_lifecycle_cases(db_session: Session):
     orchestrator = AnalysisOrchestrator(db_session)
     pr_url = "https://github.com/test/repo/pull/10"
     
-    with patch("codegate.services.analysis_orchestrator.CodeGateAdapter") as MockAdapter:
+    with (
+        patch("codegate.services.analysis_orchestrator.CodeGateAdapter") as MockAdapter,
+        patch("codegate.services.analysis_orchestrator.StaticAnalysisRunner.run_all", new_callable=AsyncMock),
+    ):
         # Case A: New analysis
         mock_adapter_instance = MockAdapter.return_value
         # Use an async mock for run()

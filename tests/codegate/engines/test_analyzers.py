@@ -142,6 +142,7 @@ async def test_analyzer_runner_timeout_and_failure(sample_workspace):
     async def mock_wait_for(aw, timeout):
         call_count["ruff"] += 1
         if call_count["ruff"] == 1:
+            aw.close()
             raise asyncio.TimeoutError()
         return await original_wait_for(aw, timeout)
         

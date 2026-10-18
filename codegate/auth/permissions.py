@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from codegate.database.models import TeamMember
 from codegate.database.models.team import Role
 
+
 class Permissions(str, Enum):
     # Workspace
     WORKSPACE_VIEW = "workspace.view"

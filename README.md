@@ -6,6 +6,8 @@ CodeGate is a comprehensive Pull Request Quality Intelligence Platform that anal
 
 *If you are reviewing this project for a defense or presentation, please start here: [**Final Defense & Documentation Index**](docs/README.md).*
 
+**Vietnamese technical handbook and repair notes:** [Architecture, setup, verified fixes, and limitations](docs/CODEGATE_TECHNICAL_HANDBOOK_VI.md).
+
 ## What CodeGate Does
 
 When a developer opens or updates a Pull Request:
@@ -14,7 +16,7 @@ When a developer opens or updates a Pull Request:
 3. **Async Analysis** is enqueued and processed by Celery Workers.
 4. **AI Review** evaluates the code changes for bugs, security, and quality issues.
 5. **Static Analysis** scans the AST for deterministic flaws.
-6. **Tests/Coverage** are evaluated via a safe execution sandbox.
+6. **Tests/Coverage** are evaluated when explicitly configured; execution is disabled by default.
 7. **Quality Score & Risk Score** are computed based on findings.
 8. **Policy** is evaluated (PASS, WARNING, BLOCK).
 9. **Reviewer Recommendation** suggests the best engineers to review the PR.
@@ -28,7 +30,7 @@ When a developer opens or updates a Pull Request:
 - **Merge Policy Engine:** Blocks, warns, or passes based on strict, configurable evidence.
 - **Reviewer Recommendations:** Smart suggestions based on CODEOWNERS, file history, and directory expertise.
 - **Full Analytics Dashboard:** React/Vite SPA for exploring PR quality trends and tenant data.
-- **Secure Sandbox Testing:** Docker-based execution of repository test suites.
+- **Configurable Test Execution:** Docker-based execution with resource limits and workspace validation; a dedicated worker and deployment validation are required for untrusted code. Local execution requires explicit operator opt-in and trusted repositories.
 
 ## Architecture
 

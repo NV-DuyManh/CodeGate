@@ -5,6 +5,8 @@ import subprocess
 import tempfile
 from typing import Optional
 
+from codegate.config.settings import settings
+
 logger = logging.getLogger(__name__)
 
 class AnalyzerWorkspace:
@@ -40,25 +42,42 @@ class AnalyzerWorkspace:
         try:
             # We clone the repo. Doing a full clone can be slow, so we try fetching the specific SHA
             # Initialize empty git repo
-            subprocess.run(["git", "init"], cwd=self.workspace_dir, check=True, capture_output=True)
+            subprocess.run(["git", "init"], cwd=self.workspace_dir, check=True, capture_output=True,
+                           timeout=settings.ANALYZER_TIMEOUT_SECONDS)
             
             # Add remote
-            subprocess.run(["git", "remote", "add", "origin", auth_url], cwd=self.workspace_dir, check=True, capture_output=True)
+            subprocess.run(["git", "remote", "add", "origin", auth_url], cwd=self.workspace_dir,
+                           check=True, capture_output=True, timeout=settings.ANALYZER_TIMEOUT_SECONDS)
             
             # Fetch the specific SHA. Note: Many git servers allow fetching by SHA (allowReachableSHA1InWant)
             # If this fails due to server restrictions, a shallow clone of the branch might be needed,
             # but for this system, we try fetching the exact SHA first.
             fetch_cmd = ["git", "fetch", "--depth", "1", "origin", self.head_sha]
-            subprocess.run(fetch_cmd, cwd=self.workspace_dir, check=True, capture_output=True)
+            subprocess.run(fetch_cmd, cwd=self.workspace_dir, check=True, capture_output=True,
+                           timeout=settings.ANALYZER_TIMEOUT_SECONDS)
             
             # Checkout
-            subprocess.run(["git", "checkout", "FETCH_HEAD"], cwd=self.workspace_dir, check=True, capture_output=True)
+            subprocess.run(["git", "checkout", "FETCH_HEAD"], cwd=self.workspace_dir, check=True,
+                           capture_output=True, timeout=settings.ANALYZER_TIMEOUT_SECONDS)
             
             return self.workspace_dir
         except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to prepare workspace: {e.stderr.decode('utf-8', errors='ignore')}")
+            stderr = e.stderr or b""
+            message = stderr.decode("utf-8", errors="replace") if isinstance(stderr, bytes) else str(stderr)
+            if self.token:
+                message = message.replace(self.token, "[REDACTED]")
+            logger.error("Failed to prepare workspace: %s", message)
             self.cleanup()
-            raise RuntimeError(f"Workspace preparation failed: git error")
+            # CalledProcessError includes argv, which may contain the authenticated remote URL.
+            raise RuntimeError("Workspace preparation failed: git error") from None
+        except subprocess.TimeoutExpired:
+            logger.error("Git workspace preparation timed out")
+            self.cleanup()
+            raise RuntimeError("Workspace preparation failed: git timed out") from None
+        except OSError:
+            logger.error("Git could not be launched during workspace preparation")
+            self.cleanup()
+            raise RuntimeError("Workspace preparation failed: git unavailable") from None
 
     def cleanup(self):
         """Cleans up the temporary workspace."""

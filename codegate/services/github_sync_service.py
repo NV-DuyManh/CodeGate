@@ -1,16 +1,16 @@
+import logging
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
+from codegate.database.models.github import GitHubConnection
 from codegate.database.models.pull_request import PullRequest
 from codegate.database.models.repository import Repository
+from codegate.services.github_app import GitHubAppService
 from codegate.services.pr_service import PullRequestService
 from codegate.services.repository_service import RepositoryService
 from pr_agent.git_providers import get_git_provider_with_context
-from codegate.database.models.github import GitHubConnection
-from codegate.services.github_app import GitHubAppService
-from datetime import datetime, timezone
-import logging
 
 logger = logging.getLogger(__name__)
 

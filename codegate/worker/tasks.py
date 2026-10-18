@@ -1,15 +1,14 @@
+import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Optional
 
 from celery import Task
 from celery.exceptions import Retry
 
-from codegate.database.session import SessionLocal
-from codegate.database.models.analysis import AnalysisRun, AnalysisJob, Status
+from codegate.database.models.analysis import AnalysisJob, AnalysisRun, Status
 from codegate.database.models.pull_request import PullRequest
+from codegate.database.session import SessionLocal
 from codegate.services.analysis_orchestrator import AnalysisOrchestrator
-from pr_agent.git_providers import get_git_provider
 
 from .celery_app import celery_app
 
@@ -59,7 +58,7 @@ def analyze_pull_request(self, analysis_run_id: int):
         job.status = "SKIPPED"
         job.finished_at = datetime.now(timezone.utc)
         db.commit()
-        logger.info(f"Analysis run {analysis_run_id} is already in state {run.status.name}. Skipping.")
+        logger.info(f"Analysis run {analysis_run_id} is already in state {run.status}. Skipping.")
         return
 
     pr = db.query(PullRequest).filter_by(id=run.pull_request_id).first()
@@ -114,17 +113,8 @@ def analyze_pull_request(self, analysis_run_id: int):
 
         # 3. Execute Analysis
         orchestrator = AnalysisOrchestrator(db)
-        # We need to run _execute_run async. But this task is sync.
-        # Wait, AnalysisOrchestrator is async!
-        import asyncio
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            logger.warning("Event loop is already running in celery thread. Creating a new one.")
-            new_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(new_loop)
-            new_loop.run_until_complete(orchestrator._execute_run(run, pr_url))
-        else:
-            loop.run_until_complete(orchestrator._execute_run(run, pr_url))
+        # A synchronous Celery task owns and closes its event loop for each invocation.
+        asyncio.run(orchestrator._execute_run(run, pr_url))
 
         # Check the run status after execution
         db.refresh(run)

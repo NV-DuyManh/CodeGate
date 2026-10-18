@@ -1,7 +1,7 @@
 from typing import List, Optional, Tuple
 
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from codegate.api.exceptions import ConflictException, NotFoundException

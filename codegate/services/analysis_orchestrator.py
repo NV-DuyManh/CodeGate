@@ -1,11 +1,12 @@
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Tuple
+from typing import Optional, Tuple
 
 from sqlalchemy.orm import Session
 
 from codegate.database.models.analysis import AnalysisRun, Finding, Status, Trigger
 from codegate.database.models.pull_request import PullRequest
+from codegate.engines.analyzers.runner import StaticAnalysisRunner
 from codegate.integrations.pr_agent.adapter import CodeGateAdapter
 from codegate.integrations.pr_agent.normalizer import PRAgentNormalizer
 from codegate.services.policy_publisher import GitHubPolicyCheckPublisher
@@ -102,6 +103,19 @@ class AnalysisOrchestrator:
             
             # Commit findings first so quality engine can read them
             self.db.commit()
+
+            # Analyze the same immutable head before scoring static findings and metrics.
+            repository = run.pull_request.repository
+            provider = getattr(getattr(adapter, "reviewer", None), "git_provider", None)
+            token = getattr(getattr(provider, "auth", None), "token", None)
+            static_runner = StaticAnalysisRunner(
+                self.db,
+                run,
+                clone_url=repository.url,
+                head_sha=run.head_sha,
+                token=token if isinstance(token, str) else None,
+            )
+            await static_runner.run_all()
             
             # 1. Execute Tests & Coverage
             try:

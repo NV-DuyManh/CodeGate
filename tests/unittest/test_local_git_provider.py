@@ -104,7 +104,7 @@ def test_publish_code_suggestions_writes_improve_file(tmp_path):
     ]
 
     assert provider.publish_code_suggestions(code_suggestions) is True
-    content = improve_path.read_text()
+    content = improve_path.read_text(encoding="utf-8")
     # each suggestion's file, line range and rendered body make it into the file.
     assert "### a.py [3-5]" in content
     assert "### b.py [7]" in content  # single-line range collapses to one number
@@ -133,7 +133,7 @@ def test_publish_code_suggestions_uses_custom_heading_without_identity(tmp_path)
     finally:
         restore_settings(snapshot)
 
-    content = improve_path.read_text()
+    content = improve_path.read_text(encoding="utf-8")
     assert content.startswith("# Team Suggestions ✨\n\n")
     assert "<!-- pr-agent:improve" not in content
 
@@ -169,7 +169,7 @@ async def test_publish_no_suggestions_routes_local_git_output_to_improve_file(tm
         restore_settings(snapshot)
 
     assert provider.supports_code_suggestions_artifact() is True
-    content = improve_path.read_text()
+    content = improve_path.read_text(encoding="utf-8")
     assert content.startswith("# Team Suggestions ✨\n\n")
     assert "No code suggestions found for the PR." in content
     assert "Run details" in content

@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
-from codegate.database.models import GitHubConnection, Repository
 from codegate.api.dependencies import get_db
+from codegate.database.models import GitHubConnection, Repository
 from codegate.worker.celery_app import celery_app
 
 router = APIRouter(prefix="/system", tags=["System"])

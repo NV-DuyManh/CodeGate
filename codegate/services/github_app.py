@@ -1,12 +1,12 @@
-import time
-import jwt
-import httpx
-from fastapi import HTTPException
 import logging
-from typing import Optional, Dict, Any
+import time
+from typing import Any, Dict
+
+import httpx
+import jwt
+from fastapi import HTTPException
 
 from codegate.config.settings import settings
-
 
 logger = logging.getLogger(__name__)
 

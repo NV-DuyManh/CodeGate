@@ -1,12 +1,9 @@
+from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, List, Optional
 
-if TYPE_CHECKING:
-    from codegate.database.models.policy import QualityPolicy
-    from codegate.database.models.pull_request import PullRequest
-from sqlalchemy import Boolean, ForeignKey, String, UniqueConstraint, DateTime
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from datetime import datetime
 
 from codegate.database.base import Base, TimestampMixin
 
@@ -55,3 +52,9 @@ class Repository(Base, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("github_connection_id", "provider_repository_id", name="uix_github_connection_provider_repo_id"),
     )
+
+
+# Resolve relationship hints only after all model classes have been defined.
+if TYPE_CHECKING:
+    from codegate.database.models.policy import QualityPolicy
+    from codegate.database.models.pull_request import PullRequest

@@ -27,7 +27,6 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true # Report but don't strictly fail on every generic token pattern without review
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -38,23 +37,22 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pip-audit
-          # Fail only on high/critical, or just report for now
-          pip-audit -r requirements.txt || echo "Pip audit discovered findings."
+          pip-audit -r requirements.txt
           
       - name: Bandit Security Scan
         run: |
-          pip install bandit
+          pip install bandit==1.9.4
           bandit -r codegate tools -ll -ii
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           
       - name: NPM Dependency Audit
         working-directory: ./dashboard
         run: |
-          npm audit || echo "NPM audit discovered findings."
+          npm audit
 
   backend-tests:
     name: CodeGate / Backend
@@ -89,10 +87,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Use Node.js 20
+      - name: Use Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: "dashboard/package-lock.json"
           
@@ -115,6 +113,8 @@ jobs:
   postgres-ci:
     name: CodeGate / PostgreSQL
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql+psycopg2://codegate:ci_password_only@localhost:5432/codegate
     services:
       postgres:
         image: postgres:16-alpine
@@ -144,24 +144,32 @@ jobs:
           pip install -r requirements.txt
           
       - name: Alembic Upgrade Head
-        env:
-          DATABASE_URL: postgresql+psycopg2://codegate:ci_password_only@localhost:5432/codegate
         run: |
           alembic upgrade head
           
       - name: Verify Single Head
         run: |
-          HEADS=$(alembic heads | wc -l)
-          if [ "$HEADS" -ne 1 ]; then
-            echo "Multiple Alembic heads detected!"
-            exit 1
-          fi
-          CURRENT=$(alembic current)
-          echo "Current head is: $CURRENT"
+          python - <<'PY'
+          import os
+          from alembic.config import Config
+          from alembic.runtime.migration import MigrationContext
+          from alembic.script import ScriptDirectory
+          from sqlalchemy import create_engine
+
+          expected = set(ScriptDirectory.from_config(Config("alembic.ini")).get_heads())
+          if len(expected) != 1:
+              raise SystemExit(f"Expected one migration head, found: {sorted(expected)}")
+          engine = create_engine(os.environ["DATABASE_URL"])
+          with engine.connect() as connection:
+              current = set(MigrationContext.configure(connection).get_current_heads())
+          engine.dispose()
+          if current != expected:
+              raise SystemExit(f"Database heads {sorted(current)} differ from migration heads {sorted(expected)}")
+          print(f"Database is at the single migration head: {next(iter(current))}")
+          PY
           
       - name: Postgres CRUD Test
         env:
-          DATABASE_URL: postgresql+psycopg2://codegate:ci_password_only@localhost:5432/codegate
           PYTHONPATH: .
         run: |
           python tools/test_postgres_crud.py
@@ -199,10 +207,8 @@ jobs:
         run: |
           pip install -r requirements.txt -r requirements-dev.txt
           
-      - name: Run Upstream Tests (Baseline Allowed)
+      - name: Run Upstream Tests
         env:
           PYTHONPATH: .
         run: |
-          # We run tests, but we ignore exit code 1 if it only fails on known baseline failures.
-          pytest tests/unittest -q || echo "Upstream failures detected. Inspecting if they are within approved baseline."
-          # Advanced checking can be added here. Currently just reporting.
+          pytest tests/unittest -q

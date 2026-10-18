@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from enum import Enum
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -81,3 +81,9 @@ class PullRequestFile(Base):
     __table_args__ = (
         UniqueConstraint("pull_request_id", "filename", name="uix_pull_request_id_filename"),
     )
+
+
+# Resolve relationship hints only after all model classes have been defined.
+if TYPE_CHECKING:
+    from codegate.database.models.analysis import AnalysisRun
+    from codegate.database.models.repository import Repository

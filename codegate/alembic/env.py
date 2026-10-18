@@ -1,3 +1,5 @@
+import os
+import sys
 from logging.config import fileConfig
 
 from alembic import context
@@ -14,14 +16,12 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-import os
-import sys
-
 # Add the project root to the python path so imports work
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
-from codegate.config.settings import settings
-from codegate.database.models import Base
+# Resolve project modules after configuring Alembic's import path.
+from codegate.config.settings import settings  # noqa: E402
+from codegate.database.models import Base  # noqa: E402
 
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 

@@ -2,25 +2,12 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, Any, List, Optional
 
-if TYPE_CHECKING:
-    from codegate.database.models.policy import PolicyEvaluation
-    from codegate.database.models.pull_request import PullRequest
-
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint
-from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.types import JSON
 
 from codegate.database.base import Base, TimestampMixin
+from codegate.database.types import JSONType
 
-
-# Use JSONB for postgres, fallback to JSON
-class JSONType(JSON):
-    pass
-
-@compiles(JSONType, 'postgresql')
-def compile_json_type(type_, compiler, **kw):
-    return "JSONB"
 
 class Status(str, Enum):
     PENDING = "PENDING"
@@ -279,3 +266,10 @@ class RiskScore(Base, TimestampMixin):
     calculation_version: Mapped[str] = mapped_column(String(50), nullable=False)
 
     analysis_run: Mapped["AnalysisRun"] = relationship("AnalysisRun", back_populates="risk_scores")
+
+
+# Resolve relationship hints only after all model classes have been defined.
+if TYPE_CHECKING:
+    from codegate.database.models.policy import PolicyEvaluation
+    from codegate.database.models.pull_request import PullRequest
+    from codegate.database.models.testing import TestRun

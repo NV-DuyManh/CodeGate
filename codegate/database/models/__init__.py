@@ -9,6 +9,7 @@ from codegate.database.models.analysis import (
     Status,
     Trigger,
 )
+from codegate.database.models.auth import AuthSession
 from codegate.database.models.github import GitHubConnection
 from codegate.database.models.policy import (
     EvaluationStatus,
@@ -28,7 +29,6 @@ from codegate.database.models.team import Role, Team, TeamMember
 from codegate.database.models.testing import CoverageReport, TestConfiguration, TestRun
 from codegate.database.models.user import User
 from codegate.database.models.webhook import WebhookEvent
-from codegate.database.models.auth import AuthSession
 
 __all__ = [
     "Base",

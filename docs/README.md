@@ -1,5 +1,7 @@
 # CodeGate Documentation Index
 
+- [**Vietnamese Technical Handbook**](CODEGATE_TECHNICAL_HANDBOOK_VI.md): Architecture, source map, scoring, setup, verified repairs, demo guide, and remaining limitations (18 October 2026).
+
 Welcome to the CodeGate developer and architecture documentation. CodeGate is a complex platform combining AI inference, static analysis, containerized testing, and a web dashboard. 
 
 This directory contains the final, authoritative documentation for understanding, configuring, and extending the platform.

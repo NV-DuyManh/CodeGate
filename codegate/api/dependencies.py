@@ -39,7 +39,11 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
         raise HTTPException(status_code=401, detail="Invalid session")
         
     now = datetime.now(timezone.utc)
-    if auth_session.expires_at < now:
+    expires_at = auth_session.expires_at
+    # SQLite returns naive values even for DateTime(timezone=True); stored sessions use UTC.
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at <= now:
         raise HTTPException(status_code=401, detail="Session expired")
         
     if auth_session.revoked_at:
@@ -84,10 +88,6 @@ def require_workspace_permission(permission: str):
     Dependency generator that verifies the user has the required permission
     in their active workspace. Returns the active workspace Team object.
     """
-    import os
-    if os.environ.get("TESTING") == "1":
-        return get_current_workspace
-
     def permission_checker(
         user: User = Depends(get_current_user), 
         db: Session = Depends(get_db)
