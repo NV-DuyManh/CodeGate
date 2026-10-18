@@ -40,6 +40,7 @@ async def _communicate_limited(process, timeout_seconds: int) -> Tuple[bytes, by
         try:
             process.kill()
         except ProcessLookupError:
+            # The process exited between the timeout and our kill request.
             pass
         await process.wait()
     finally:

@@ -124,3 +124,9 @@ Lượt upstream cuối: **2578 passed, 1 skipped, 1 xfailed, 0 failed**. Bộ C
 - `CodeGate_Fixes.patch` áp dụng từ commit xuất phát bằng `git apply`; bản ZIP đã chứa các thay đổi, không apply patch thêm lần nữa vào ZIP.
 - `validation/` trong ZIP chứa bằng chứng được chọn. `SOURCE_MANIFEST.json` ghi SHA-256 file nguồn để kiểm tra archive.
 - Nhánh GitHub của bản sửa: https://github.com/NV-DuyManh/CodeGate/tree/fix/codegate-runtime-ci-docs. Xem lịch sử commit và pull request để kiểm tra trạng thái upload/CI; bản báo cáo được chốt trước bước push.
+
+## 10. Kiểm tra trước merge — CodeQL
+
+Lượt hosted CI đầu đã qua CodeGate CI (backend, frontend, security, PostgreSQL migrations/CRUD, Docker build, upstream regression), Docker tests và coverage. Kiểm tra CodeQL bổ sung báo cyclic import ở các model và các cảnh báo lint; chưa merge khi kiểm tra này còn lỗi.
+
+Bản bổ sung tách JSONType sang `codegate/database/types.py`, giữ import tương thích từ analysis, chuyển các import chỉ phục vụ type hints xuống sau khai báo model, bỏ import vòng qua package models ở testing, và dọn các cảnh báo còn lại. Không thay schema/công thức scoring. Đã chạy lại backend: 231 passed, 6 skipped; thêm 5 tests thứ tự import/mapping/JSONB và JSON đều đạt. Ruff và Flake8 correctness đạt. CodeQL và toàn bộ CI sẽ được chạy lại trên commit bổ sung trước merge.

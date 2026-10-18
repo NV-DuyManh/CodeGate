@@ -2,15 +2,11 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Optional
 
-if TYPE_CHECKING:
-    from codegate.database.models.analysis import AnalysisRun
-    from codegate.database.models.repository import Repository
-
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from codegate.database.base import Base, TimestampMixin
-from codegate.database.models.analysis import JSONType
+from codegate.database.types import JSONType
 
 
 class PolicyDecision(str, Enum):
@@ -112,3 +108,9 @@ class PolicyEvaluation(Base, TimestampMixin):
 
     analysis_run: Mapped["AnalysisRun"] = relationship("AnalysisRun", back_populates="policy_evaluations")
     policy: Mapped["QualityPolicy"] = relationship("QualityPolicy", back_populates="evaluations")
+
+
+# Resolve relationship hints only after all model classes have been defined.
+if TYPE_CHECKING:
+    from codegate.database.models.analysis import AnalysisRun
+    from codegate.database.models.repository import Repository

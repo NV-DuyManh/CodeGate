@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from codegate.api.exceptions import ConflictException, NotFoundException
-from codegate.database.models import Provider, PullRequest, Repository, State
+from codegate.database.models import PullRequest, Repository, State
 from codegate.repositories.pr_store import pr_store
 from codegate.repositories.repo_store import repo_store
 from codegate.schemas.pull_request import PullRequestCreate, PullRequestUpdate

@@ -5,12 +5,8 @@ from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
-if TYPE_CHECKING:
-    from codegate.database.models.analysis import AnalysisRun
-    from codegate.database.models.repository import Repository
-
-from codegate.database.models import Base
-from codegate.database.models.analysis import JSONType
+from codegate.database.base import Base
+from codegate.database.types import JSONType
 
 
 class TestConfiguration(Base):
@@ -104,3 +100,9 @@ class CoverageReport(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
     test_run: Mapped["TestRun"] = relationship("TestRun", back_populates="coverage_report")
+
+
+# Resolve relationship hints only after all model classes have been defined.
+if TYPE_CHECKING:
+    from codegate.database.models.analysis import AnalysisRun
+    from codegate.database.models.repository import Repository

@@ -102,7 +102,6 @@ class PytestRunner:
                     coverage_metrics = CoverageParser.parse(f.read())
                     
         # Determine test outcome
-        test_outcome = TestOutcome.UNKNOWN
         if exit_code != 0:
             test_outcome = TestOutcome.FAILED
         elif junit_metrics.tests > 0:
@@ -111,9 +110,6 @@ class PytestRunner:
             else:
                 test_outcome = TestOutcome.PASSED
         else:
-            if exit_code == 0:
-                test_outcome = TestOutcome.PASSED
-            else:
-                test_outcome = TestOutcome.FAILED
+            test_outcome = TestOutcome.PASSED
                 
         return ExecutionStatus.COMPLETED, test_outcome, junit_metrics, coverage_metrics, stdout, stderr

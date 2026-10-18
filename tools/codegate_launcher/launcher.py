@@ -9,7 +9,7 @@ import time
 import tkinter as tk
 import webbrowser
 from datetime import datetime
-from tkinter import font, messagebox, scrolledtext, ttk
+from tkinter import messagebox, scrolledtext, ttk
 
 # Ensure requests is available, otherwise fail gracefully
 try:

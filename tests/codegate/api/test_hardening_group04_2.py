@@ -1,10 +1,10 @@
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from sqlalchemy.orm import Session
 
-from codegate.database.models.analysis import AnalysisRun, Status, Trigger
+from codegate.database.models.analysis import Status, Trigger
 from codegate.database.models.pull_request import PullRequest
 from codegate.database.models.repository import Repository
 from codegate.services.analysis_orchestrator import AnalysisOrchestrator

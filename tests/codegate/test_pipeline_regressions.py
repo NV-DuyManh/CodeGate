@@ -93,7 +93,7 @@ async def test_workspace_failure_does_not_publish_a_successful_analysis(db_sessi
     adapter = MagicMock()
     adapter.run = AsyncMock(return_value={"review": {"key_issues_to_review": []}})
     monkeypatch.setattr("codegate.services.analysis_orchestrator.CodeGateAdapter", lambda _: adapter)
-    monkeypatch.setattr("codegate.services.analysis_orchestrator.get_git_provider", lambda: MagicMock())
+    monkeypatch.setattr("codegate.services.analysis_orchestrator.get_git_provider", MagicMock)
     monkeypatch.setattr("codegate.services.test_service.TestExecutionService.execute_tests", AsyncMock())
     monkeypatch.setattr("codegate.services.reviewer_service.reviewer_service.evaluate_and_persist", MagicMock())
     monkeypatch.setattr("codegate.services.analysis_orchestrator.GitHubPolicyCheckPublisher", MagicMock())
@@ -128,7 +128,7 @@ def test_celery_task_owns_event_loop_when_none_is_installed(db_session, monkeypa
         db_session.commit()
 
     monkeypatch.setattr(AnalysisOrchestrator, "_execute_run", execute)
-    monkeypatch.setattr("pr_agent.config_loader.get_settings", lambda: MagicMock())
+    monkeypatch.setattr("pr_agent.config_loader.get_settings", MagicMock)
     monkeypatch.setattr(analyze_pull_request, "_db", db_session)
     asyncio.set_event_loop(None)
 

@@ -7,10 +7,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from codegate.database.base import Base, TimestampMixin
 
-if TYPE_CHECKING:
-    from codegate.database.models.analysis import AnalysisRun
-    from codegate.database.models.repository import Repository
-
 
 class State(str, Enum):
     OPEN = "OPEN"
@@ -85,3 +81,9 @@ class PullRequestFile(Base):
     __table_args__ = (
         UniqueConstraint("pull_request_id", "filename", name="uix_pull_request_id_filename"),
     )
+
+
+# Resolve relationship hints only after all model classes have been defined.
+if TYPE_CHECKING:
+    from codegate.database.models.analysis import AnalysisRun
+    from codegate.database.models.repository import Repository
