@@ -1,7 +1,8 @@
+from typing import Optional
+
 import httpx
 from fastapi import HTTPException
 from pydantic import BaseModel
-from typing import Optional
 
 
 class GitHubUser(BaseModel):

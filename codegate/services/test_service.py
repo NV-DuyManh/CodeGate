@@ -3,14 +3,21 @@ import os
 import shutil
 import tempfile
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
+from codegate.config.settings import settings
 from codegate.database.models import AnalysisRun, Repository
 from codegate.database.models.testing import CoverageReport, TestConfiguration, TestRun
 from codegate.engines.testing.changed_lines import ChangedLinesResolver
-from codegate.engines.testing.executor import DisabledExecutor, DockerTestExecutor, LocalTrustedExecutor
+from codegate.engines.testing.executor import (
+    DisabledExecutor,
+    DockerTestExecutor,
+    LocalTrustedExecutor,
+    resolve_workspace_directory,
+)
 from codegate.engines.testing.pytest_runner import PytestRunner
 from codegate.engines.testing.schemas import CoverageMetrics, ExecutionStatus, JUnitMetrics, TestOutcome
 from codegate.repositories.analysis_store import AnalysisStore
@@ -23,16 +30,18 @@ class TestExecutionService:
         self.testing_store = testing_store
         self.analysis_store = analysis_store
         
-    def _get_executor(self, config: TestConfiguration):
+    def _get_executor(self, config: TestConfiguration, workspace_root: Optional[str] = None):
         if not config.enabled:
             return DisabledExecutor()
             
         executor_type = config.executor_type.upper() if config.executor_type else "DISABLED"
         if executor_type == "LOCAL_TRUSTED":
-            return LocalTrustedExecutor()
+            if not settings.ALLOW_LOCAL_TEST_EXECUTOR:
+                return DisabledExecutor()
+            return LocalTrustedExecutor(workspace_root=workspace_root)
         elif executor_type == "DOCKER":
             image = config.docker_image or "python:3.12-slim"
-            return DockerTestExecutor(docker_image=image)
+            return DockerTestExecutor(docker_image=image, workspace_root=workspace_root)
         else:
             return DisabledExecutor()
             
@@ -80,20 +89,21 @@ class TestExecutionService:
             
             import subprocess
             try:
-                subprocess.run(["git", "clone", clone_url, workspace_dir], check=True, capture_output=True)
+                subprocess.run(["git", "clone", clone_url, workspace_dir], check=True, capture_output=True, timeout=300)
                 if head_sha:
-                    subprocess.run(["git", "checkout", head_sha], cwd=workspace_dir, check=True, capture_output=True)
+                    subprocess.run(["git", "checkout", head_sha], cwd=workspace_dir, check=True,
+                                   capture_output=True, timeout=60)
             except subprocess.CalledProcessError as e:
                 logger.error(f"Failed to clone {clone_url} for run {analysis_run_id}: {e.stderr}")
                 raise
 
-            working_directory = workspace_dir
-            if config.working_directory:
-                working_directory = os.path.join(working_directory, config.working_directory)
+            working_directory = str(resolve_workspace_directory(
+                workspace_dir, os.path.join(workspace_dir, config.working_directory or ".")
+            ))
                 
             self.testing_store.update_test_run(db, analysis_run_id, {"execution_status": ExecutionStatus.RUNNING.value})
             
-            executor = self._get_executor(config)
+            executor = self._get_executor(config, workspace_dir)
             runner = PytestRunner(executor)
             
             test_paths = config.test_paths_json or []
@@ -118,7 +128,16 @@ class TestExecutionService:
             changed_missing = 0
             
             if cov and config.coverage_enabled:
-                changed_lines_map = await ChangedLinesResolver.get_changed_lines(repo_path, base_sha, head_sha)
+                changed_lines_map = await ChangedLinesResolver.get_changed_lines(workspace_dir, base_sha, head_sha)
+
+                # Coverage paths are relative to the test working directory,
+                # while git paths are relative to the checkout root.
+                prefix = Path(working_directory).relative_to(Path(workspace_dir).resolve())
+                if cov.files:
+                    cov.files = {
+                        (prefix / path.replace("\\", "/")).as_posix(): data
+                        for path, data in cov.files.items()
+                    }
                 
                 if not base_sha:
                     # Missing base_sha, coverage = null

@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from codegate.api.main import app
+from codegate.config.settings import settings
 from codegate.database.models.webhook import WebhookEvent
 from codegate.database.models.pull_request import PullRequest
 from codegate.database.models.analysis import AnalysisRun, Trigger, Status
@@ -40,19 +41,15 @@ def test_normalizer_basic():
     assert findings[1].category == "SECURITY"
     assert findings[1].title == "Security Concern"
 
-def test_webhook_unauthorized():
+def test_webhook_unauthorized(client, monkeypatch):
+    monkeypatch.setattr(settings, "GITHUB_WEBHOOK_SECRET", "test-webhook-secret")
     response = client.post("/api/v1/github_webhooks", json={"action": "opened"}, headers={})
-    # Our webhook secret is not set in test environment by default unless get_settings().github.webhook_secret is set.
-    # If it is not set, it bypasses signature check. Let's see what happens.
-    # Assuming it is set or not set, it should at least return 200 or 401.
-    assert response.status_code in [200, 401]
+    assert response.status_code == 401
 
-def test_webhook_deduplication(db_session: Session):
-    from codegate.api.dependencies import get_db
-    app.dependency_overrides[get_db] = lambda: db_session
-    # Send a webhook without signature if secret is None
+def test_webhook_deduplication(client, db_session: Session, monkeypatch):
+    monkeypatch.setattr(settings, "GITHUB_WEBHOOK_SECRET", "test-webhook-secret")
     headers = {
-        "X-GitHub-Event": "pull_request",
+        "X-GitHub-Event": "ping",
         "X-GitHub-Delivery": "test-delivery-id-dedup-123"
     }
     body = {
@@ -61,13 +58,16 @@ def test_webhook_deduplication(db_session: Session):
         "repository": {"full_name": "foo/bar"}
     }
     
-    response = client.post("/api/v1/github_webhooks", json=body, headers=headers)
-    assert response.status_code in [200, 401]
-    
-    if response.status_code == 200:
-        assert response.json() == {"status": "accepted"}
-        
-        # Send duplicate
-        response2 = client.post("/api/v1/github_webhooks", json=body, headers=headers)
-        assert response2.status_code == 200
-        assert response2.json() == {"status": "ignored", "reason": "Duplicate event"}
+    body_bytes = json.dumps(body).encode()
+    headers["X-Hub-Signature-256"] = "sha256=" + hmac.new(
+        b"test-webhook-secret", body_bytes, hashlib.sha256
+    ).hexdigest()
+    response = client.post("/api/v1/github_webhooks", content=body_bytes, headers=headers)
+    assert response.status_code == 202
+    assert response.json() == {"status": "accepted"}
+    assert db_session.query(WebhookEvent).count() == 1
+
+    response2 = client.post("/api/v1/github_webhooks", content=body_bytes, headers=headers)
+    assert response2.status_code == 200
+    assert response2.json() == {"status": "ignored", "reason": "Duplicate event"}
+    assert db_session.query(WebhookEvent).count() == 1

@@ -18,7 +18,7 @@ class BanditAnalyzer(BaseAnalyzer):
     @property
     def command(self) -> List[str]:
         import sys
-        return [sys.executable, "-m", "bandit", "-r", ".", "-f", "json"]
+        return [sys.executable, "-I", "-m", "bandit", "-r", ".", "-f", "json"]
 
     def supports(self) -> bool:
         try:

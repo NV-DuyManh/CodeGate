@@ -1,11 +1,14 @@
 from datetime import datetime, timezone
 from enum import Enum
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from codegate.database.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from codegate.database.models.user import User
 
 
 class Role(str, Enum):

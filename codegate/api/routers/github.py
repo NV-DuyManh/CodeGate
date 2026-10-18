@@ -1,23 +1,23 @@
-import secrets
+import asyncio
 import hashlib
-from datetime import datetime, timezone, timedelta
+import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from codegate.database.models.github import GitHubConnection, GitHubInstallationState
-from codegate.api.dependencies import get_db, get_current_user, require_workspace_permission
+from codegate.api.dependencies import get_current_user, get_db, require_workspace_permission
 from codegate.auth.permissions import Permissions
-from codegate.database.models import Team, User
-from codegate.services.github_app import GitHubAppService
 from codegate.config.settings import settings
+from codegate.database.models import Team, User
+from codegate.database.models.github import GitHubConnection, GitHubInstallationState
 from codegate.database.session import SessionLocal
+from codegate.services.github_app import GitHubAppService
 from codegate.services.github_sync_service import GithubSyncService
-import asyncio
 
 router = APIRouter(prefix="/integrations/github", tags=["GitHub Integration"])
 

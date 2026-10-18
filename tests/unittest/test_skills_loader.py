@@ -224,6 +224,8 @@ class TestPathExpansion:
     def test_tilde_in_path_is_expanded(self, tmp_path, monkeypatch):
         _write_skill(tmp_path, "homestest")
         monkeypatch.setenv("HOME", str(tmp_path))
+        # ntpath.expanduser uses USERPROFILE on Windows, not HOME.
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
         skills = discover_skills(["~"])
         assert [s.name for s in skills] == ["homestest"]
 

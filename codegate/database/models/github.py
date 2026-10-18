@@ -1,10 +1,13 @@
 from datetime import datetime
+from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, func, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from typing import Optional
 
 from codegate.database.base import Base
+
+if TYPE_CHECKING:
+    from codegate.database.models.repository import Repository
 
 
 class GitHubConnection(Base):

@@ -174,7 +174,10 @@ def test_manual_sync_cross_workspace(client: TestClient, db_session: Session, sy
         response = client.post(f"/api/v1/integrations/github/connections/{conn2.id}/sync")
         assert response.status_code == 404
 
-def test_webhook_unknown_installation(client: TestClient, db_session: Session):
+def test_webhook_unknown_installation(client: TestClient, db_session: Session, monkeypatch):
+    from codegate.config.settings import settings
+
+    monkeypatch.setattr(settings, "GITHUB_WEBHOOK_SECRET", "test-webhook-secret")
     # Payload with unknown installation
     payload = {
         "action": "added",

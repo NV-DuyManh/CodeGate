@@ -417,6 +417,17 @@ async def _flush_litellm_batch_callbacks(timeout: float, cleanup_deadline_state=
         get_logger().warning("litellm callback integration did not flush within timeout")
 
 
+async def _wait_for_tasks_until(tasks, timeout: float) -> None:
+    """Recheck early timer wakeups without extending the cleanup deadline."""
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + max(0.0, timeout)
+    pending = set(tasks)
+    while pending:
+        _, pending = await asyncio.wait(pending, timeout=max(0.0, deadline - loop.time()))
+        if loop.time() >= deadline:
+            return
+
+
 async def _cancel_and_reap_tasks(
     tasks,
     cleanup_timeout: float,
@@ -439,7 +450,7 @@ async def _cancel_and_reap_tasks(
         return
 
     async def wait_for_cancellation() -> None:
-        await asyncio.wait(pending, timeout=max(0.0, cleanup_timeout))
+        await _wait_for_tasks_until(pending, cleanup_timeout)
 
     if not protect_from_cancellation:
         await wait_for_cancellation()
@@ -463,7 +474,7 @@ async def _reap_cancelled_tasks(tasks, cleanup_timeout: float) -> None:
         return
 
     async def wait_for_cancellation() -> None:
-        await asyncio.wait(pending, timeout=max(0.0, cleanup_timeout))
+        await _wait_for_tasks_until(pending, cleanup_timeout)
 
     cleanup_waiter = asyncio.create_task(wait_for_cancellation())
     while not cleanup_waiter.done():
@@ -750,7 +761,10 @@ async def drain_litellm_callbacks(timeout: float = DEFAULT_CALLBACK_TIMEOUT_SECO
             if worker_flush_failed:
                 return False
             if worker_flush_task is None:
-                if end_time - loop.time() <= 0:
+                # A coarse timer can overshoot a round's small phase window.
+                # Still give the worker a turn while the overall producer
+                # budget remains; otherwise every round can skip its flush.
+                if producer_deadline - loop.time() <= 0:
                     return False
                 worker_flush_task = asyncio.create_task(run_worker_flush())
             done, _pending = await asyncio.wait(

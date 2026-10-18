@@ -1,166 +1,180 @@
 import asyncio
 import os
+import re
 import sys
+import uuid
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 
+def resolve_workspace_directory(workspace_root: str, working_directory: str) -> Path:
+    """Resolve symlinks and reject directories outside the allocated checkout."""
+    root = Path(workspace_root).resolve(strict=True)
+    directory = Path(working_directory).resolve(strict=True)
+    if not root.is_dir() or not directory.is_dir() or not directory.is_relative_to(root):
+        raise ValueError("Working directory must be inside the allocated workspace.")
+    return directory
+
+
+async def _communicate_limited(process, timeout_seconds: int) -> Tuple[bytes, bytes, bool]:
+    """Drain both pipes continuously while retaining at most 64 KiB per pipe."""
+    async def read_limited(stream):
+        retained = bytearray()
+        truncated = False
+        while chunk := await stream.read(8192):
+            available = max(0, 64 * 1024 - len(retained))
+            retained.extend(chunk[:available])
+            truncated = truncated or len(chunk) > available
+        if truncated:
+            retained.extend(b"\n...[TRUNCATED]")
+        return bytes(retained)
+
+    stdout_task = asyncio.create_task(read_limited(process.stdout))
+    stderr_task = asyncio.create_task(read_limited(process.stderr))
+    timed_out = False
+    try:
+        await asyncio.wait_for(process.wait(), timeout=timeout_seconds)
+    except asyncio.TimeoutError:
+        timed_out = True
+        try:
+            process.kill()
+        except ProcessLookupError:
+            pass
+        await process.wait()
+    finally:
+        # Descendants can inherit pipes; do not wait indefinitely for EOF.
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                asyncio.gather(stdout_task, stderr_task), timeout=5
+            )
+        except asyncio.TimeoutError:
+            stdout, stderr = b"", b"Output drain timed out."
+    return stdout, stderr, timed_out
+
+
 class TestExecutor(ABC):
-    """Protocol for safely executing tests."""
-    
     @abstractmethod
-    async def execute(self, 
-                      command: List[str], 
-                      working_directory: str, 
-                      env: Optional[Dict[str, str]] = None,
-                      timeout_seconds: int = 900,
+    async def execute(self, command: List[str], working_directory: str,
+                      env: Optional[Dict[str, str]] = None, timeout_seconds: int = 900,
                       network_enabled: bool = False) -> Tuple[int, str, str, bool]:
-        """
-        Executes the given command safely.
-        Returns:
-            (exit_code, stdout, stderr, is_timeout)
-        """
-        pass
+        """Return (exit_code, stdout, stderr, is_timeout)."""
 
 
 class DisabledExecutor(TestExecutor):
-    """Default executor that simply rejects execution for safety."""
-    
-    async def execute(self, 
-                      command: List[str], 
-                      working_directory: str, 
-                      env: Optional[Dict[str, str]] = None,
-                      timeout_seconds: int = 900,
+    async def execute(self, command: List[str], working_directory: str,
+                      env: Optional[Dict[str, str]] = None, timeout_seconds: int = 900,
                       network_enabled: bool = False) -> Tuple[int, str, str, bool]:
         return -1, "Test execution is DISABLED by policy.", "", False
 
 
-class LocalTrustedExecutor(TestExecutor):
-    """
-    Executes tests locally via safe subprocess. 
-    WARNING: THIS IS NOT A SANDBOX. It executes arbitrary repository code.
-    Use ONLY for trusted environments.
-    """
-    
-    def _sanitize_env(self, provided_env: Optional[Dict[str, str]]) -> Dict[str, str]:
-        safe_env = {}
-        # Allow basic system paths and variables
-        for key in ["PATH", "SYSTEMROOT", "USERPROFILE", "HOME", "LANG", "LC_ALL"]:
-            if key in os.environ:
-                safe_env[key] = os.environ[key]
-        
-        if provided_env:
-            for k, v in provided_env.items():
-                safe_env[k] = v
-        return safe_env
+class WorkspaceExecutor(TestExecutor):
+    def __init__(self, workspace_root: Optional[str] = None):
+        self.workspace_root = workspace_root
 
     def _validate_path(self, working_directory: str) -> bool:
-        # Prevent traversal and absolute path injection.
-        if ".." in working_directory:
+        if not self.workspace_root:
             return False
-            
-        # Reject absolute paths (Linux/macOS) unless it's the expected temp workspace
-        if working_directory.startswith("/") and not working_directory.startswith("/tmp/codegate_tests_"):
+        try:
+            resolve_workspace_directory(self.workspace_root, working_directory)
+        except (OSError, ValueError, RuntimeError):
             return False
-            
-        # Reject Windows drive escapes (e.g. C:\)
-        if len(working_directory) >= 2 and working_directory[1] == ":" and working_directory[0].isalpha():
-            return False
-            
-        # Reject Windows UNC paths
-        if working_directory.startswith("\\\\"):
-            return False
-            
         return True
 
-    async def execute(self, 
-                      command: List[str], 
-                      working_directory: str, 
-                      env: Optional[Dict[str, str]] = None,
-                      timeout_seconds: int = 900,
+
+class LocalTrustedExecutor(WorkspaceExecutor):
+    """Runs arbitrary repository code on the host. This is NOT a sandbox.
+
+    Enable only with server-side opt-in and repositories the operator trusts.
+    The workspace check prevents configuration mistakes, not malicious Python.
+    """
+
+    python_executable = sys.executable
+
+    def _sanitize_env(self, provided_env: Optional[Dict[str, str]]) -> Dict[str, str]:
+        safe_env = {
+            key: os.environ[key]
+            for key in ["PATH", "SYSTEMROOT", "USERPROFILE", "HOME", "LANG", "LC_ALL", "TEMP", "TMP"]
+            if key in os.environ
+        }
+        if provided_env:
+            safe_env.update(provided_env)
+        return safe_env
+
+    async def execute(self, command: List[str], working_directory: str,
+                      env: Optional[Dict[str, str]] = None, timeout_seconds: int = 900,
                       network_enabled: bool = False) -> Tuple[int, str, str, bool]:
-        
         if not self._validate_path(working_directory):
-            return -1, "", "Path traversal detected in working directory.", False
-            
-        safe_env = self._sanitize_env(env)
-        
+            return -1, "", "Working directory is outside the allocated workspace.", False
         try:
-            # We enforce shell=False inherently by passing a list to create_subprocess_exec
             process = await asyncio.create_subprocess_exec(
-                *command,
-                cwd=working_directory,
-                env=safe_env,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                *command, cwd=working_directory, env=self._sanitize_env(env),
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
             )
-            
-            try:
-                stdout_bytes, stderr_bytes = await asyncio.wait_for(process.communicate(), timeout=timeout_seconds)
-                is_timeout = False
-            except asyncio.TimeoutError:
-                process.kill()
-                await process.communicate()  # drain
+            stdout, stderr, timed_out = await _communicate_limited(process, timeout_seconds)
+            if timed_out:
                 return -1, "", f"Execution timed out after {timeout_seconds} seconds.", True
-                
-            stdout = stdout_bytes.decode('utf-8', errors='replace')
-            stderr = stderr_bytes.decode('utf-8', errors='replace')
-            
-            # Truncate output to prevent unbounded memory/db consumption
-            max_len = 64 * 1024
-            if len(stdout) > max_len:
-                stdout = stdout[:max_len] + "\n...[TRUNCATED]"
-            if len(stderr) > max_len:
-                stderr = stderr[:max_len] + "\n...[TRUNCATED]"
-                
-            exit_code = process.returncode if process.returncode is not None else -1
-            return exit_code, stdout, stderr, is_timeout
-            
-        except Exception as e:
-            return -1, "", f"Executor exception: {str(e)}", False
+            return (
+                process.returncode if process.returncode is not None else -1,
+                stdout.decode("utf-8", errors="replace"), stderr.decode("utf-8", errors="replace"), False
+            )
+        except Exception as exc:
+            return -1, "", f"Executor exception: {exc}", False
 
 
-class DockerTestExecutor(TestExecutor):
+class DockerTestExecutor(WorkspaceExecutor):
+    """Container execution with bounded output and explicit workspace mounting.
+
+    Requires a reachable Docker daemon. Use a dedicated worker for untrusted PRs;
+    this container implementation is not a guarantee against hostile code.
     """
-    Executes tests via a Docker container for isolation.
-    Stub implementation for production architecture blueprint.
-    """
-    
-    def __init__(self, docker_image: str):
+
+    def __init__(self, docker_image: str, workspace_root: Optional[str] = None):
+        super().__init__(workspace_root)
         self.docker_image = docker_image
-        
-    async def execute(self, 
-                      command: List[str], 
-                      working_directory: str, 
-                      env: Optional[Dict[str, str]] = None,
-                      timeout_seconds: int = 900,
+
+    async def execute(self, command: List[str], working_directory: str,
+                      env: Optional[Dict[str, str]] = None, timeout_seconds: int = 900,
                       network_enabled: bool = False) -> Tuple[int, str, str, bool]:
-        # Implement safe docker run building
-        network_flag = "bridge" if network_enabled else "none"
+        if not self._validate_path(working_directory):
+            return -1, "", "Working directory is outside the allocated workspace.", False
+        if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._/:@-]*", self.docker_image):
+            return -1, "", "Invalid Docker image reference.", False
+        container_name = f"codegate-test-{uuid.uuid4().hex}"
         docker_cmd = [
-            "docker", "run", 
-            "--rm", 
-            "--memory=1g",
-            "--cpus=1.0",
-            "--network", network_flag,
-            "-v", f"{working_directory}:/workspace",
-            "-w", "/workspace",
-            self.docker_image
+            "docker", "run", "--rm", "--name", container_name,
+            "--memory=1g", "--cpus=1.0", "--pids-limit=256",
+            "--cap-drop=ALL", "--security-opt=no-new-privileges",
+            "--network", "bridge" if network_enabled else "none",
+            "-v", f"{Path(working_directory).resolve()}:/workspace", "-w", "/workspace",
         ]
-        docker_cmd.extend(command)
-        
-        # Uses standard safe argv construction internally (shell=False)
-        process = await asyncio.create_subprocess_exec(
-            *docker_cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        
+        for key, value in (env or {}).items():
+            docker_cmd.extend(["--env", f"{key}={value}"])
+        docker_cmd.extend([self.docker_image, *command])
         try:
-            stdout_bytes, stderr_bytes = await asyncio.wait_for(process.communicate(), timeout=timeout_seconds)
-            is_timeout = False
-        except asyncio.TimeoutError:
-            process.kill()
-            return -1, "", f"Docker execution timed out after {timeout_seconds} seconds.", True
-            
-        return process.returncode if process.returncode is not None else -1, stdout_bytes.decode('utf-8', errors='replace'), stderr_bytes.decode('utf-8', errors='replace'), is_timeout
+            process = await asyncio.create_subprocess_exec(
+                *docker_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr, timed_out = await _communicate_limited(process, timeout_seconds)
+            if timed_out:
+                return -1, "", f"Docker execution timed out after {timeout_seconds} seconds.", True
+            return (
+                process.returncode if process.returncode is not None else -1,
+                stdout.decode("utf-8", errors="replace"), stderr.decode("utf-8", errors="replace"), False
+            )
+        except Exception as exc:
+            return -1, "", f"Docker executor exception: {exc}", False
+        finally:
+            # Killing the CLI alone does not stop its container.
+            try:
+                cleanup = await asyncio.create_subprocess_exec(
+                    "docker", "rm", "--force", container_name,
+                    stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
+                )
+                try:
+                    await asyncio.wait_for(cleanup.wait(), timeout=10)
+                except asyncio.TimeoutError:
+                    cleanup.kill()
+                    await cleanup.wait()
+            except OSError:
+                pass

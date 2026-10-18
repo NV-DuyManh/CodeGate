@@ -1,7 +1,16 @@
 from typing import Any, List, Optional
 
 from codegate.database.models.analysis import Finding, QualityScore, RiskScore, Severity, Source
-from codegate.engines.policy.config import *
+from codegate.engines.policy.config import (
+    RULE_ID_MAX_CRITICAL_FINDINGS,
+    RULE_ID_MAX_HIGH_SECURITY_FINDINGS,
+    RULE_ID_MAX_RISK_SCORE,
+    RULE_ID_MIN_QUALITY_SCORE,
+    RULE_ID_QUALITY_AVAILABILITY,
+    RULE_ID_QUALITY_COMPLETENESS,
+    RULE_ID_RISK_AVAILABILITY,
+    RULE_ID_RISK_COMPLETENESS,
+)
 from codegate.engines.policy.schemas import PolicyConfig, PolicyDecision, RuleResult
 
 
@@ -318,6 +327,17 @@ def evaluate_test_result(config: PolicyConfig, test_run: Optional[Any]) -> Optio
             expected_value="Passed",
             reason=f"Tests failed: {test_run.tests_failed} failed, {test_run.tests_errors} errors.",
             flags=["TEST_FAILURE"]
+        )
+
+    if test_run.execution_status != "COMPLETED" or test_run.test_outcome != "PASSED":
+        return RuleResult(
+            rule_id=RULE_ID_TEST_EXECUTION,
+            rule_name="Test Execution",
+            status=PolicyDecision.BLOCK if config.require_tests else PolicyDecision.WARNING,
+            actual_value=f"{test_run.execution_status}/{test_run.test_outcome}",
+            expected_value="Completed / Passed",
+            reason="Test execution did not produce a completed, passing result.",
+            flags=["INCOMPLETE_TESTS"]
         )
         
     return RuleResult(

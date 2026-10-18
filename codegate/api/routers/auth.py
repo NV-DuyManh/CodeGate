@@ -1,5 +1,6 @@
 import hashlib
 import secrets
+import urllib.parse
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
@@ -16,9 +17,6 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 # State caching (in-memory for simplicity in Phase 7; in prod use redis or signed cookie)
 # Using a signed cookie is better for statelessness
-import urllib.parse
-
-
 @router.get("/github/login")
 async def github_login(response: Response):
     """
@@ -143,8 +141,7 @@ async def github_callback(
     db.commit()
 
     # Create response and set cookie
-    # Redirect to frontend dashboard (which can be hardcoded for Phase 7 or config driven)
-    redirect_url = "http://127.0.0.1:5173/"
+    redirect_url = settings.CODEGATE_FRONTEND_URL.rstrip("/") + "/"
     response = RedirectResponse(redirect_url)
     
     response.set_cookie(

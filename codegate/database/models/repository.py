@@ -4,9 +4,10 @@ from typing import TYPE_CHECKING, List, Optional
 if TYPE_CHECKING:
     from codegate.database.models.policy import QualityPolicy
     from codegate.database.models.pull_request import PullRequest
-from sqlalchemy import Boolean, ForeignKey, String, UniqueConstraint, DateTime
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from codegate.database.base import Base, TimestampMixin
 

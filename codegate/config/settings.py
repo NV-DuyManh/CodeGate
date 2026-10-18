@@ -13,6 +13,7 @@ class CodeGateSettings(BaseSettings):
     RUFF_ENABLED: bool = True
     BANDIT_ENABLED: bool = True
     RADON_ENABLED: bool = True
+    ALLOW_LOCAL_TEST_EXECUTOR: bool = False
     
     # Auth Settings
     GITHUB_OAUTH_CLIENT_ID: str | None = None
@@ -25,6 +26,7 @@ class CodeGateSettings(BaseSettings):
     GITHUB_APP_ID: str | None = None
     GITHUB_APP_SLUG: str | None = None
     GITHUB_APP_PRIVATE_KEY_PATH: str | None = None
+    GITHUB_WEBHOOK_SECRET: str | None = None
     GITHUB_APP_SETUP_URL: str = "http://127.0.0.1:8000/api/v1/integrations/github/setup"
     CODEGATE_FRONTEND_URL: str = "http://127.0.0.1:5173"
 

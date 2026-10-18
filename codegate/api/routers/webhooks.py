@@ -8,13 +8,14 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
 from codegate.api.dependencies import get_db
-from codegate.database.models.analysis import AnalysisRun, AnalysisJob, Status, Trigger
+from codegate.config.settings import settings as cg_settings
+from codegate.database.models.analysis import AnalysisJob, AnalysisRun, Status, Trigger
 from codegate.database.models.github import GitHubConnection
 from codegate.database.models.repository import Repository
 from codegate.database.models.webhook import WebhookEvent
 from codegate.services.github_sync_service import GithubSyncService
-from pr_agent.config_loader import get_settings
 from codegate.worker.tasks import analyze_pull_request
+from pr_agent.config_loader import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +50,6 @@ async def process_webhook_synchronously(db: Session, delivery_id: str, event_typ
                 connection = db.query(GitHubConnection).filter_by(installation_id=installation_id).first()
                 if not connection:
                     raise ValueError(f"No active GitHubConnection found for installation {installation_id}")
-                
-                from codegate.config.settings import settings as cg_settings
                 
                 get_settings().set("GITHUB.DEPLOYMENT_TYPE", "app")
                 get_settings().set("GITHUB.APP_ID", cg_settings.GITHUB_APP_ID)
@@ -142,10 +141,11 @@ async def handle_github_webhooks(
     except Exception as e:
         raise HTTPException(status_code=400, detail="Error parsing JSON")
 
-    webhook_secret = getattr(get_settings().github, 'webhook_secret', None)
-    if webhook_secret:
-        signature_header = request.headers.get('x-hub-signature-256', None)
-        verify_signature(body_bytes, webhook_secret, signature_header)
+    webhook_secret = cg_settings.GITHUB_WEBHOOK_SECRET
+    if not webhook_secret:
+        raise HTTPException(status_code=503, detail="GitHub webhook verification is not configured")
+    signature_header = request.headers.get('x-hub-signature-256', None)
+    verify_signature(body_bytes, webhook_secret, signature_header)
 
     event_type = request.headers.get("X-GitHub-Event", "unknown")
     delivery_id = request.headers.get("X-GitHub-Delivery", "")

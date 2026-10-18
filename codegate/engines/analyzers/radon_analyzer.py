@@ -17,7 +17,7 @@ class RadonAnalyzer(BaseAnalyzer):
     @property
     def command(self) -> List[str]:
         import sys
-        return [sys.executable, "-m", "radon", "cc", ".", "--json"]
+        return [sys.executable, "-I", "-m", "radon", "cc", ".", "--json"]
 
     def supports(self) -> bool:
         try:

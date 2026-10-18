@@ -19,7 +19,7 @@ class RuffAnalyzer(BaseAnalyzer):
     def command(self) -> List[str]:
         # Using sys.executable to ensure we run the installed ruff in the same environment
         import sys
-        return [sys.executable, "-m", "ruff", "check", ".", "--output-format", "json"]
+        return [sys.executable, "-I", "-m", "ruff", "check", ".", "--output-format", "json"]
 
     def supports(self) -> bool:
         try:

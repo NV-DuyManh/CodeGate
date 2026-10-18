@@ -6,14 +6,15 @@ from sqlalchemy.orm import Session
 from codegate.api.dependencies import get_current_workspace, get_db, require_workspace_permission
 from codegate.api.pagination import PaginationParams, get_pagination_params, paginate
 from codegate.auth.permissions import Permissions
+from codegate.config.settings import settings
 from codegate.database.models import Provider, Team
 from codegate.repositories.policy_store import quality_policy_store
+from codegate.repositories.testing_store import TestingStore
 from codegate.schemas.pagination import PaginatedResponse
 from codegate.schemas.policy import QualityPolicyResponse, QualityPolicyUpdate
 from codegate.schemas.repository import RepositoryCreate, RepositoryResponse, RepositoryUpdate
 from codegate.schemas.testing import TestConfigurationResponse, TestConfigurationUpdate
 from codegate.services.repository_service import repository_service
-from codegate.repositories.testing_store import TestingStore
 
 router = APIRouter(prefix="/repositories", tags=["Repositories"])
 
@@ -122,6 +123,8 @@ def get_repository_testing(
     config = store.get_test_configuration(db, repo_id)
     if not config:
         config = store.upsert_test_configuration(db, repo_id, {})
+        db.commit()
+        db.refresh(config)
     return config
 
 @router.put("/{repo_id}/testing", response_model=TestConfigurationResponse)
@@ -137,6 +140,15 @@ def update_repository_testing(
         
     store = TestingStore()
     obj_in = config_in.model_dump(exclude_unset=True)
+    existing = store.get_test_configuration(db, repo_id)
+    enabled = obj_in.get("enabled", existing.enabled if existing else False)
+    executor_type = obj_in.get("executor_type", existing.executor_type if existing else "DISABLED")
+    if enabled and (executor_type or "DISABLED").upper() == "LOCAL_TRUSTED" and not settings.ALLOW_LOCAL_TEST_EXECUTOR:
+        raise HTTPException(status_code=403, detail="Local test execution is disabled by server policy")
+    for field in ("test_paths", "pytest_args", "coverage_source"):
+        if field in obj_in:
+            obj_in[f"{field}_json"] = obj_in.pop(field)
     config = store.upsert_test_configuration(db, repo_id, obj_in)
     db.commit()
+    db.refresh(config)
     return config

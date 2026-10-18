@@ -1,11 +1,15 @@
 from datetime import datetime, timezone
 from enum import Enum
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from codegate.database.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from codegate.database.models.analysis import AnalysisRun
+    from codegate.database.models.repository import Repository
 
 
 class State(str, Enum):

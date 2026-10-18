@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from codegate.api.dependencies import get_current_user, get_db, require_workspace_permission
-from codegate.auth.permissions import Permissions, check_last_admin, can_grant_role
+from codegate.auth.permissions import Permissions, can_grant_role, check_last_admin
 from codegate.database.models import Team, User
 from codegate.database.models.team import InvitationStatus, Role, TeamMember, WorkspaceInvitation
 
@@ -216,11 +216,14 @@ def get_invitation(token: str, db: Session = Depends(get_db)):
     if not invitation:
         raise HTTPException(status_code=404, detail="Invalid invitation token")
         
-    if invitation.expires_at < datetime.now(timezone.utc):
+    expires_at = invitation.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at <= datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Invitation expired")
         
     if invitation.status != InvitationStatus.PENDING:
-        raise HTTPException(status_code=400, detail=f"Invitation is already {invitation.status.value.lower()}")
+        raise HTTPException(status_code=400, detail=f"Invitation is already {invitation.status.lower()}")
         
     return InvitationResponse(
         id=invitation.id,
@@ -252,18 +255,21 @@ def accept_invitation(
     if not invitation:
         raise HTTPException(status_code=404, detail="Invalid invitation token")
         
-    if invitation.expires_at < datetime.now(timezone.utc):
+    expires_at = invitation.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at <= datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Invitation expired")
         
     if invitation.status != InvitationStatus.PENDING:
-        raise HTTPException(status_code=400, detail=f"Invitation is already {invitation.status.value.lower()}")
+        raise HTTPException(status_code=400, detail=f"Invitation is already {invitation.status.lower()}")
         
     # Enforce strict github login match if target was specified
     if invitation.invitee_github_login and invitation.invitee_github_login.lower() != user.username.lower():
         raise HTTPException(status_code=403, detail="This invitation was sent to a different GitHub account")
         
     # Enforce strict email match if target was specified
-    if invitation.invitee_email and invitation.invitee_email.lower() != user.email.lower():
+    if invitation.invitee_email and (not user.email or invitation.invitee_email.lower() != user.email.lower()):
         raise HTTPException(status_code=403, detail="This invitation was sent to a different email account")
         
     # Check if already a member

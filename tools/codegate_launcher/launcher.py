@@ -1,15 +1,15 @@
 import json
 import os
+import re
+import socket
 import subprocess
 import sys
 import threading
 import time
 import tkinter as tk
 import webbrowser
-import re
-import socket
 from datetime import datetime
-from tkinter import messagebox, ttk, font, scrolledtext
+from tkinter import font, messagebox, scrolledtext, ttk
 
 # Ensure requests is available, otherwise fail gracefully
 try:
