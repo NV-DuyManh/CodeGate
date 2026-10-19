@@ -10,6 +10,7 @@ import { Skeleton } from '../components/ui/Skeleton';
 import { formatPercentage, formatDate } from '../lib/utils';
 import { Badge } from '../components/ui/Badge';
 import { useAuth } from '../contexts/AuthContext';
+import { DEMO_MODE } from '../demo/transport';
 
 export function PullRequests() {
   const { workspaceVersion } = useAuth();
@@ -17,8 +18,14 @@ export function PullRequests() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [policyFilter, setPolicyFilter] = useState('ALL');
+  const [stateFilter, setStateFilter] = useState('ALL');
+  const [repositoryFilter, setRepositoryFilter] = useState('ALL');
+  const [page, setPage] = useState(1);
 
   const load = () => {
+    setPage(1);
+    setRepositoryFilter('ALL');
     setLoading(true);
     setError(null);
     CodeGateAPI.getPullRequests()
@@ -30,12 +37,17 @@ export function PullRequests() {
   useEffect(() => { load(); }, [workspaceVersion]);
 
   const filtered = data.filter((pr) => {
+    if (policyFilter !== 'ALL' && pr.policy_decision !== policyFilter) return false;
+    if (stateFilter !== 'ALL' && pr.state !== stateFilter) return false;
+    if (repositoryFilter !== 'ALL' && pr.repository !== repositoryFilter) return false;
     if (!search) return true;
     const s = search.toLowerCase();
     return pr.title.toLowerCase().includes(s) ||
            pr.author.toLowerCase().includes(s) ||
            pr.repository.toLowerCase().includes(s);
   });
+  const pages = Math.max(1, Math.ceil(filtered.length / 5));
+  const visible = DEMO_MODE ? filtered.slice((page - 1) * 5, page * 5) : filtered;
 
   if (loading) {
     return (
@@ -75,9 +87,20 @@ export function PullRequests() {
             type="search"
             placeholder="Search title, author, repository…"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
           />
         </label>
+        {DEMO_MODE && <>
+          <select aria-label="Policy filter" value={policyFilter} onChange={event => { setPolicyFilter(event.target.value); setPage(1); }}>
+            <option value="ALL">All policies</option><option value="PASS">Pass</option><option value="WARNING">Warning</option><option value="BLOCK">Block</option>
+          </select>
+          <select aria-label="State filter" value={stateFilter} onChange={event => { setStateFilter(event.target.value); setPage(1); }}>
+            <option value="ALL">All states</option><option value="OPEN">Open</option><option value="MERGED">Merged</option>
+          </select>
+          <select aria-label="Repository filter" value={repositoryFilter} onChange={event => { setRepositoryFilter(event.target.value); setPage(1); }}>
+            <option value="ALL">All repositories</option>{[...new Set(data.map(pr => pr.repository))].map(name => <option key={name} value={name}>{name}</option>)}
+          </select>
+        </>}
         <span className="scope-note font-medium text-slate-500">
           {filtered.length} of {data.length} loaded pull requests
         </span>
@@ -100,7 +123,7 @@ export function PullRequests() {
       ) : (
         <div className="table-wrapper">
           <table className="cg-table">
-            <caption className="table-caption">Loaded results; the API returns up to 20 records.</caption>
+            <caption className="table-caption">{DEMO_MODE ? 'Sample pull requests · Select a row to explore review evidence.' : 'Loaded results; the API returns up to 20 records.'}</caption>
             <thead>
               <tr>
                 <th>Pull Request</th>
@@ -117,7 +140,7 @@ export function PullRequests() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((pr) => (
+              {visible.map((pr) => (
                 <tr key={pr.pull_request_id}>
                   <td>
                     <Link to={`/pull-requests/${pr.pull_request_id}`} className="cell-link font-semibold text-[var(--cg-text)] hover:text-[var(--cg-primary)]">
@@ -199,6 +222,10 @@ export function PullRequests() {
           </table>
         </div>
       )}
+      {DEMO_MODE && filtered.length > 0 && <nav className="pagination-controls" aria-label="Pull request pages">
+        <span>Showing {(page - 1) * 5 + 1}–{Math.min(page * 5, filtered.length)} of {filtered.length} sample pull requests</span>
+        <div className="flex gap-3 items-center"><button className="btn-secondary" aria-label="Previous page" disabled={page <= 1} onClick={() => setPage(current => current - 1)}>Previous</button><span>Page {page} of {pages}</span><button className="btn-secondary" aria-label="Next page" disabled={page >= pages} onClick={() => setPage(current => current + 1)}>Next</button></div>
+      </nav>}
     </div>
   );
 }

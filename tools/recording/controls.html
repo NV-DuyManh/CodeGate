@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CodeGate · local runtime controls</title>
+<style>
+body{margin:0;background:#080b14;color:#edf1ff;font:16px/1.65 system-ui,sans-serif;padding:48px;max-width:1100px}
+h1{font-size:34px;line-height:1.2}p{color:#aeb8d1;max-width:900px}.badge{color:#a7f3d0;text-transform:uppercase;letter-spacing:2px;font-size:13px}
+button,a{background:#193770;color:white;border:1px solid #466ab5;border-radius:8px;padding:12px 18px;margin:6px;cursor:pointer;font:inherit;text-decoration:none;display:inline-block}
+button:disabled{opacity:.45;cursor:wait}pre{padding:22px;background:#101726;border:1px solid #283751;border-radius:12px;white-space:pre-wrap;font:14px/1.6 ui-monospace,monospace}
+.note{border-left:3px solid #e9b560;padding-left:18px}strong{color:#fff}
+</style>
+<div class="badge">CodeGate / local runtime</div><h1>Run the actual analysis engines</h1>
+<p>These controls generate a local Git repository and execute CodeGate's existing Ruff, Bandit, Radon, pytest,
+coverage, quality, risk and policy services. Results are written to the configured database and read by the existing dashboard.</p>
+<p class="note"><strong>Scope:</strong> local session and source fixture. GitHub OAuth, GitHub App, AI review and GitHub check publishing are not configured.
+The fixed case passes its tests. The policy retains a warning because quality dimensions are incomplete.</p>
+<p class="note">The current quality engine can display an AI review subscore of 100 when no AI findings exist.
+No AI request runs here; that number does not demonstrate an AI review.</p>
+<button id="session">1. Open local session</button><button data-case="unsafe">2. Analyze regression</button>
+<button data-case="safe">3. Analyze fix</button><a href="__DASHBOARD_URL__" target="_blank" rel="noopener">Open CodeGate dashboard ↗</a>
+<pre id="output">Ready. No analysis results have been fabricated.</pre>
+<script>
+const out=document.querySelector('#output');
+async function request(path,body){const response=await fetch('/api/v1/recording/'+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});const data=await response.json();if(!response.ok)throw Error(JSON.stringify(data));return data;}
+document.querySelector('#session').onclick=async()=>{try{out.textContent=JSON.stringify(await request('session'),null,2);}catch(error){out.textContent=String(error);}};
+for(const button of document.querySelectorAll('[data-case]'))button.onclick=async()=>{
+ document.querySelectorAll('button').forEach(item=>item.disabled=true);
+ out.textContent='Running actual Git checkout, analyzer subprocesses, pytest and coverage. Waiting for their results…';
+ try{await request('session');const result=await request('analyze',{case:button.dataset.case});
+ out.textContent=JSON.stringify({case:result.case,analysis_id:result.analysis.id,pull_request_id:result.pull_request.id,base_sha:result.base_sha,head_sha:result.head_sha,analyzers:result.analyzers.map(({analyzer,status,duration_ms})=>({analyzer,status,duration_ms})),findings:result.findings.map(({source,rule_id,title,file_path,start_line})=>({source,rule_id,title,file_path,start_line})),tests:{outcome:result.tests.test_outcome,total:result.tests.tests_total,passed:result.tests.tests_passed,failed:result.tests.tests_failed},changed_line_coverage:result.coverage?.changed_line_coverage,quality:result.quality.overall_score,quality_missing_dimensions:result.quality.missing_dimensions,risk:result.risk.overall_risk,policy:result.policy.decision,flags:result.policy.flags_json,integrations:result.integrations},null,2);
+ }catch(error){out.textContent=String(error);}finally{document.querySelectorAll('button').forEach(item=>item.disabled=false);}
+};
+</script></html>

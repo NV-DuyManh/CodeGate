@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { UserPlus, Mail, ShieldAlert, Trash2, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
+import { DEMO_MODE } from '../demo/transport';
 
 interface Member {
   user_id: number;
@@ -134,7 +135,7 @@ export function WorkspaceMembers() {
   };
 
   const handleRemoveMember = async (userId: number) => {
-    if (!confirm('Are you sure you want to remove this member from the workspace? They will lose access immediately.')) return;
+    if (!confirm(DEMO_MODE ? 'Remove this sample member in this browser? Reset demo restores them.' : 'Are you sure you want to remove this member from the workspace? They will lose access immediately.')) return;
     try {
       const res = await fetch(`http://127.0.0.1:8000/api/v1/workspaces/active/members/${userId}`, {
         method: 'DELETE',
@@ -156,7 +157,8 @@ export function WorkspaceMembers() {
 
   return (
     <div className="page-stack">
-      <PageHeader title="Workspace Members" description={activeWorkspace?.name} actions={canInvite && <Button onClick={() => setShowInviteModal(true)}><UserPlus size={16} />Invite Teammate</Button>} />
+      <PageHeader title="Workspace Members" description={activeWorkspace?.name} actions={canInvite && <Button disabled={DEMO_MODE} title={DEMO_MODE ? 'Invitations require a configured live backend.' : undefined} onClick={() => setShowInviteModal(true)}><UserPlus size={16} />Invite Teammate</Button>} />
+      {DEMO_MODE && <p className="alert">Try changing a sample role or removing a sample member. Changes stay in this browser. Sending invitations requires a configured live backend.</p>}
       
       {error && !showInviteModal && (
         <div className="alert alert--error" role="alert">

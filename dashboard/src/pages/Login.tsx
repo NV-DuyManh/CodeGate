@@ -4,18 +4,20 @@ import { useAuth } from '../contexts/AuthContext';
 import { GitBranch, Shield, Sparkles, BookOpen } from 'lucide-react';
 import { AuthShell } from '../components/ui/AuthShell';
 import { Skeleton } from '../components/ui/Skeleton';
+import { DEMO_MODE } from '../demo/transport';
 
 export function Login() {
   const { authenticated, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!loading && authenticated) {
+    if (!DEMO_MODE && !loading && authenticated) {
       navigate('/dashboard', { replace: true });
     }
   }, [authenticated, loading, navigate]);
 
   const handleLogin = () => {
+    if (DEMO_MODE) { navigate('/dashboard'); return; }
     window.location.href = 'http://127.0.0.1:8000/api/v1/auth/github/login';
   };
 
@@ -30,8 +32,8 @@ export function Login() {
   return (
     <AuthShell
       title="Welcome to CodeGate"
-      description="Sign in to your engineering workspace."
-      badgeText="Next-Gen Automated Code Review"
+      description={DEMO_MODE ? 'Explore a sample engineering workspace. No account required.' : 'Sign in to your engineering workspace.'}
+      badgeText={DEMO_MODE ? 'Interactive demo · Sample data' : 'Next-Gen Automated Code Review'}
     >
       <div className="flex flex-col gap-4">
         <button
@@ -39,11 +41,11 @@ export function Login() {
           className="btn-primary w-full py-3 text-[15px] shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/35"
         >
           <GitBranch size={19} strokeWidth={2.2} />
-          Continue with GitHub
+          {DEMO_MODE ? 'Explore demo' : 'Continue with GitHub'}
         </button>
 
         <p className="text-center text-xs text-slate-500 font-medium">
-          Authentication is handled by GitHub.
+          {DEMO_MODE ? 'Sample data only. Changes stay in this browser.' : 'Authentication is handled by GitHub.'}
         </p>
 
         <div className="border-t border-[var(--cg-border-soft)] pt-4 mt-2 grid grid-cols-3 gap-2 text-center">

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { CodeGateAPI } from '../api/client';
 import type { PullRequestDashboardDetail } from '../types';
@@ -24,9 +24,10 @@ import { Skeleton } from '../components/ui/Skeleton';
 import { Badge } from '../components/ui/Badge';
 import { formatPercentage, formatScore, formatDate } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import { activeDemo, DEMO_MODE } from '../demo/transport';
 
 export function PullRequestDetail() {
-  const { workspaceVersion } = useAuth();
+  const { workspaceVersion, activeWorkspace } = useAuth();
   const { pullRequestId } = useParams<{ pullRequestId: string }>();
   const [data, setData] = useState<PullRequestDashboardDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -34,21 +35,29 @@ export function PullRequestDetail() {
   const [retrying, setRetrying] = useState(false);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [understoodFindings, setUnderstoodFindings] = useState<Record<number, boolean>>({});
+  const requestGeneration = useRef(0);
 
   const load = useCallback(() => {
     if (!pullRequestId) return;
+    const generation = ++requestGeneration.current;
     setLoading(true);
     setError(null);
     CodeGateAPI.getPullRequestDetail(parseInt(pullRequestId, 10))
-      .then(setData)
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+      .then(detail => { if (generation === requestGeneration.current) setData(detail); })
+      .catch(err => { if (generation === requestGeneration.current) setError(err.message); })
+      .finally(() => { if (generation === requestGeneration.current) setLoading(false); });
   }, [pullRequestId]);
 
-  useEffect(() => { load(); }, [load, workspaceVersion]);
+  useEffect(() => {
+    load();
+    return () => { requestGeneration.current += 1; };
+  }, [load, workspaceVersion]);
 
   const toggleUnderstood = (idx: number) => {
-    setUnderstoodFindings(prev => ({ ...prev, [idx]: !prev[idx] }));
+    const key = `${activeWorkspace?.id}:${pullRequestId}:${idx}`;
+    const current = DEMO_MODE ? activeDemo?.getUnderstood(key) : understoodFindings[idx];
+    if (DEMO_MODE) activeDemo?.setUnderstood(key, !current);
+    setUnderstoodFindings(prev => ({ ...prev, [idx]: !current }));
   };
 
   if (loading) {
@@ -181,13 +190,15 @@ export function PullRequestDetail() {
 
         <div className="page-hero__actions">
           {analysis && isTerminal && (
-            <button className="btn-secondary" onClick={handleRetry} disabled={retrying}>
+            <button className="btn-secondary" onClick={handleRetry} disabled={DEMO_MODE || retrying} title={DEMO_MODE ? 'Analysis execution requires a configured live backend.' : undefined}>
               <RefreshCw size={15} strokeWidth={2} className={retrying ? "spin" : ""} /> 
               {retrying ? 'Retrying...' : 'Retry Analysis'}
             </button>
           )}
         </div>
       </div>
+
+      {DEMO_MODE && <p className="alert">Illustrative analysis evidence. Retry Analysis requires a configured live backend. Coaching progress is saved in this browser.</p>}
 
       {/* Meta Timestamps */}
       <div className="pr-meta-bar">
@@ -371,7 +382,7 @@ export function PullRequestDetail() {
               <div className="grid grid-cols-1 gap-4">
                 {findings.map((f: any, idx: number) => {
                   const details = getConceptDetails(f.category, f.severity);
-                  const isUnderstood = !!understoodFindings[idx];
+                  const isUnderstood = DEMO_MODE ? !!activeDemo?.getUnderstood(`${activeWorkspace?.id}:${pullRequestId}:${idx}`) : !!understoodFindings[idx];
 
                   return (
                     <div

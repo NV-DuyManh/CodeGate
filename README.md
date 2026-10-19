@@ -8,6 +8,13 @@ CodeGate is a comprehensive Pull Request Quality Intelligence Platform that anal
 
 **Vietnamese technical handbook and repair notes:** [Architecture, setup, verified fixes, and limitations](docs/CODEGATE_TECHNICAL_HANDBOOK_VI.md).
 
+**Try the interactive dashboard:** [Public demo](https://codegate-demo.vercel.app) ·
+[Real local runtime video](https://codegate-demo.vercel.app/recordings/codegate-runtime.mp4).
+The public dashboard uses clearly labelled sample data and browser-local edits. The separate video records real
+Git revisions, Ruff/Bandit/Radon, pytest/coverage, PostgreSQL and the existing scoring/policy services on a controlled
+local fixture. GitHub OAuth/App, AI review and GitHub publishing are not exercised in that recording.
+See [demo deployment](docs/PUBLIC_DEMO.md) and [runtime scope and limitations](docs/RUNTIME_RECORDING.md).
+
 ## What CodeGate Does
 
 When a developer opens or updates a Pull Request:

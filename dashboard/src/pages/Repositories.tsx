@@ -10,12 +10,15 @@ import { Skeleton } from '../components/ui/Skeleton';
 import { formatPercentage, formatScore, formatDate } from '../lib/utils';
 import { Badge } from '../components/ui/Badge';
 import { useAuth } from '../contexts/AuthContext';
+import { DEMO_MODE } from '../demo/transport';
 
 export function Repositories() {
   const { workspaceVersion } = useAuth();
   const [data, setData] = useState<RepositoryDashboardItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState('name');
 
   const load = () => {
     setLoading(true);
@@ -27,6 +30,7 @@ export function Repositories() {
   };
 
   useEffect(() => { load(); }, [workspaceVersion]);
+  const visible = DEMO_MODE ? data.filter(repo => repo.name.toLowerCase().includes(search.toLowerCase())).sort((a, b) => sort === 'quality' ? (b.average_quality ?? 0) - (a.average_quality ?? 0) : a.name.localeCompare(b.name)) : data;
 
   if (loading) {
     return (
@@ -56,6 +60,11 @@ export function Repositories() {
           </button>
         }
       />
+      {DEMO_MODE && <div className="filter-card">
+        <label className="search-field"><span className="sr-only">Search repositories</span><input type="search" placeholder="Search repositories…" value={search} onChange={event => setSearch(event.target.value)} /></label>
+        <select aria-label="Sort repositories" value={sort} onChange={event => setSort(event.target.value)}><option value="name">Name A–Z</option><option value="quality">Highest quality</option></select>
+        <span className="scope-note">{visible.length} sample repositories</span>
+      </div>}
 
       {data.length === 0 ? (
         <div className="py-4">
@@ -73,7 +82,7 @@ export function Repositories() {
       ) : (
         <div className="table-wrapper">
           <table className="cg-table">
-            <caption className="table-caption">Loaded results; the API returns up to 20 records.</caption>
+            <caption className="table-caption">{DEMO_MODE ? 'Sample repositories · Explore health and local testing settings.' : 'Loaded results; the API returns up to 20 records.'}</caption>
             <thead>
               <tr>
                 <th>Repository</th>
@@ -88,7 +97,7 @@ export function Repositories() {
               </tr>
             </thead>
             <tbody>
-              {data.map((repo) => (
+              {visible.map((repo) => (
                 <tr key={repo.repository_id}>
                   <td>
                     <Link to={`/repositories/${repo.repository_id}`} className="cell-link font-semibold text-[var(--cg-text)] flex items-center gap-2 hover:text-[var(--cg-primary)]">
@@ -150,6 +159,7 @@ export function Repositories() {
           </table>
         </div>
       )}
+      {data.length > 0 && visible.length === 0 && <p className="alert">No repositories match this search. Try a different name.</p>}
     </div>
   );
 }

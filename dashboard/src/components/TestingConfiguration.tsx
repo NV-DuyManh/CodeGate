@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CodeGateAPI } from '../api/client';
 import { Settings, Save } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { DEMO_MODE } from '../demo/transport';
 
 interface TestingConfigurationProps {
   repositoryId: number;
@@ -67,10 +68,11 @@ export function TestingConfiguration({ repositoryId }: TestingConfigurationProps
         )}
         {success && (
           <div className="alert alert--success mb-4" role="status">
-            Configuration saved successfully.
+            {DEMO_MODE ? 'Sample configuration saved in this browser.' : 'Configuration saved successfully.'}
           </div>
         )}
         
+        {DEMO_MODE && <p className="muted mb-4">Try these settings locally. Commands are sample configuration and will not execute in this demo.</p>}
         <form onSubmit={handleSave} className="form-stack">
           <div className="testing-toggles">
             <label className="flex items-center gap-2 text-sm font-medium text-foreground">

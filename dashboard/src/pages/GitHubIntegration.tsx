@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { CodeGateAPI } from '../api/client';
 import { RefreshCw, ExternalLink, Plus, Trash2, GitBranch } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { DEMO_MODE } from '../demo/transport';
 
 export function GitHubIntegration() {
   const { workspaceVersion, user } = useAuth();
@@ -78,13 +79,15 @@ export function GitHubIntegration() {
             <button
               className="btn-primary"
               onClick={handleConnect}
-              disabled={installing || !user?.active_workspace_id}
+              disabled={DEMO_MODE || installing || !user?.active_workspace_id}
+              title={DEMO_MODE ? 'A live backend is required to connect GitHub.' : undefined}
             >
               <Plus size={16} />{installing ? 'Connecting...' : 'Connect GitHub'}
             </button>
           </div>
         }
       />
+      {DEMO_MODE && <p className="alert">Sample integration preview. A live backend is required to install, sync or manage GitHub connections. No GitHub account is connected.</p>}
 
       {error && (
         <div className="alert alert--error" role="alert">
@@ -93,7 +96,7 @@ export function GitHubIntegration() {
         </div>
       )}
 
-      {window.location.search.includes('github=connected') && (
+      {!DEMO_MODE && window.location.search.includes('github=connected') && (
         <p className="alert alert--success" role="status">
           GitHub installation connected successfully! Initial repository sync is running in the background.
         </p>
@@ -129,7 +132,7 @@ export function GitHubIntegration() {
               <button
                 className="btn-primary"
                 onClick={handleConnect}
-                disabled={installing || !user?.active_workspace_id}
+                disabled={DEMO_MODE || installing || !user?.active_workspace_id}
               >
                 <Plus size={16} />Connect GitHub
               </button>
@@ -183,23 +186,23 @@ export function GitHubIntegration() {
                         <button
                           className="btn-secondary text-xs py-1.5 px-3"
                           onClick={() => handleSync(c.id)}
-                          disabled={syncingId === c.id}
+                          disabled={DEMO_MODE || syncingId === c.id}
                         >
                           <RefreshCw size={13} className={syncingId === c.id ? 'spin' : ''} />
                           {syncingId === c.id ? 'Syncing...' : 'Sync now'}
                         </button>
-                        <a
+                        {DEMO_MODE ? <span className="cell-muted text-xs">Manage repositories requires live GitHub</span> : <a
                           className="btn-link text-xs flex items-center gap-1"
                           href={`https://github.com/settings/installations/${c.installation_id}`}
                           target="_blank"
                           rel="noreferrer"
                         >
                           Manage repositories<ExternalLink size={13} />
-                        </a>
+                        </a>}
                         <button
                           className="btn-danger text-xs py-1.5 px-3"
                           onClick={() => handleDisconnect(c.id)}
-                          disabled={c.status === 'disconnected'}
+                          disabled={DEMO_MODE || c.status === 'disconnected'}
                         >
                           <Trash2 size={13} />Disconnect
                         </button>
