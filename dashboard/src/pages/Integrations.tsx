@@ -5,6 +5,7 @@ import { CodeGateAPI } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Badge } from '../components/ui/Badge';
+import { DEMO_MODE } from '../demo/transport';
 
 export function Integrations() {
   const { workspaceVersion } = useAuth();
@@ -48,14 +49,14 @@ export function Integrations() {
             <div className="flex items-center gap-2 mb-1">
               <h2 className="text-base font-bold text-[var(--cg-text)]">GitHub App</h2>
               <Badge variant={ghStatus === 'Configured' ? 'success' : 'default'}>
-                {ghStatus === 'Configured' ? 'Active' : 'Setup Required'}
+                {DEMO_MODE ? 'Sample preview' : ghStatus === 'Configured' ? 'Active' : 'Setup Required'}
               </Badge>
             </div>
             <p className="text-sm text-[var(--cg-text-secondary)]">Automated webhooks, repository sync, and pull request analysis bot.</p>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs font-bold text-[var(--cg-muted)]" role="status">
-              {ghStatus}
+              {DEMO_MODE ? 'No live connection' : ghStatus}
             </span>
             <div className="w-8 h-8 rounded-full bg-[var(--cg-surface-soft)] border border-[var(--cg-border-soft)] flex items-center justify-center text-[var(--cg-muted)] group-hover:text-indigo-500 transition-colors">
               <ArrowRight size={16} />

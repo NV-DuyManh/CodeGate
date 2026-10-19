@@ -8,6 +8,8 @@ import {
 import { Badge } from '../components/ui/Badge';
 import { useAuth } from '../contexts/AuthContext';
 import { ThemeToggle } from '../components/ui/ThemeToggle';
+import { DEMO_MODE } from '../demo/transport';
+import { DemoBanner } from '../demo/DemoBanner';
 
 export function AppLayout() {
   const { user, workspaces, activeWorkspace, setActiveWorkspace, logout } = useAuth();
@@ -84,7 +86,7 @@ export function AppLayout() {
   const isLive = sysStatus?.github?.status?.toUpperCase() === 'CONNECTED' && !isDemo;
 
   return (
-    <div className="app-layout">
+    <div className={`app-layout${DEMO_MODE ? ' app-layout--demo' : ''}`}>
       <a className="skip-link" href="#main-content">Skip to content</a>
       {mobileMenuOpen && <div className="sidebar-backdrop" onClick={() => setMobileMenuOpen(false)} />}
       <aside ref={sidebar} id="app-navigation" aria-label="Main navigation" className={`sidebar ${mobileMenuOpen ? 'sidebar--open' : ''}`}>
@@ -114,7 +116,7 @@ export function AppLayout() {
         </nav>
         <div className="sidebar__status" aria-live="polite">
           <div className="flex items-center justify-between mb-2">
-            <p className="sidebar__status-title mb-0">System Monitor</p>
+            <p className="sidebar__status-title mb-0">{DEMO_MODE ? 'Demo environment' : 'System Monitor'}</p>
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -180,6 +182,7 @@ export function AppLayout() {
             </div>
           </div>
         </header>
+        {DEMO_MODE && <DemoBanner />}
         <main id="main-content" tabIndex={-1} className="content"><Outlet context={{ sysStatus, apiError }} /></main>
       </div>
     </div>
