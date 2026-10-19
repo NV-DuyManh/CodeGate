@@ -10,7 +10,7 @@ export function DemoBanner() {
     <section className="demo-banner" aria-label="Interactive demo information">
       <div className="demo-banner__label"><FlaskConical size={20} /><div><strong>Interactive demo</strong><span>Sample data · Changes stay in this browser</span></div></div>
       <div className="demo-banner__actions">
-        <a href="/recordings/codegate-runtime.mp4" target="_blank" rel="noreferrer"><Play size={14} />Watch real runtime</a>
+        <a href="/recordings/codegate-runtime-vi.mp4" target="_blank" rel="noreferrer"><Play size={14} />Watch real runtime</a>
         <a href="https://github.com/NV-DuyManh/CodeGate" target="_blank" rel="noreferrer">Source<ExternalLink size={13} /></a>
         <button onClick={() => setHelp(true)} aria-label="Demo help"><HelpCircle size={15} />Help</button>
         <button onClick={() => setReset(true)}><RotateCcw size={14} />Reset demo</button>
@@ -24,7 +24,7 @@ export function DemoBanner() {
         <p>Repository testing settings, member changes and lesson progress are saved only in this browser. Reset demo restores the original sample.</p>
         <p>All dashboard metrics, findings and recommendations are illustrative fixtures. GitHub OAuth, installations, sync, invitations, AI reviews and test execution require a configured live backend and are unavailable here.</p>
         <p>The separate runtime video shows a real local backend, database, static analysis and test execution. It does not demonstrate a connected GitHub installation or AI provider.</p>
-        <a className="btn-primary" href="/recordings/codegate-runtime.mp4" target="_blank" rel="noreferrer"><Play size={16} />Watch real runtime</a>
+        <a className="btn-primary" href="/recordings/codegate-runtime-vi.mp4" target="_blank" rel="noreferrer"><Play size={16} />Watch real runtime</a>
       </div>
     </Dialog>}
     {reset && <Dialog titleId="demo-reset-title" onClose={() => setReset(false)}>

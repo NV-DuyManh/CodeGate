@@ -1,7 +1,7 @@
 # Public dashboard demo
 
 Live URL: **https://codegate-demo.vercel.app**. The real local runtime video is available at
-**https://codegate-demo.vercel.app/recordings/codegate-runtime.mp4**.
+**https://codegate-demo.vercel.app/recordings/codegate-runtime-vi.mp4** (Vietnamese synthetic male narration).
 
 The public demo is a static build of the existing dashboard. It runs without a hosted API, database, GitHub
 installation or AI credentials. A persistent banner labels every page as sample data.
@@ -36,9 +36,11 @@ headers for an already-built artifact; it deliberately contains no server build 
 release directory as `vercel.json`, alongside `index.html`. For the Vercel CLI, select the dedicated demo project
 and account scope explicitly. Do not upload the repository root, `.env`, runtime databases or recording controls.
 
-Copy the verified runtime MP4 to `dist/recordings/codegate-runtime.mp4` before publishing. The binary is delivered
+Copy the verified narrated runtime MP4 to `dist/recordings/codegate-runtime-vi.mp4` before publishing. The binary is delivered
 as a release artifact rather than committed to Git. Without this asset the demo's video link will not work.
 The recording itself is described in [RUNTIME_RECORDING.md](RUNTIME_RECORDING.md).
+The narrated version preserves the original recorded video stream and adds a generic Vietnamese male synthetic
+voice aligned to the actual scenes. The narration does not represent a human recording or a named person's voice.
 
 ## Verification
 
